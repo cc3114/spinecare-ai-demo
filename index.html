@@ -375,7 +375,7 @@
             <div class="row" style="margin-bottom:8px;">
                 <button class="btn primary" onclick="snapshot()" data-i18n="snapBtn">📸 拍照</button>
                 <button class="btn" onclick="countdownShot()" data-i18n="snapCdBtn">⏱ 倒计时拍照</button>
-                <button class="btn" id="gesture-btn" onclick="toggleGesture()" data-i18n="snapGesBtn">✋ 手势拍照</button>
+                <button class="btn" id="gesture-btn" onclick="toggleGesture()" data-i18n="snapGesBtn">👌 OK手势拍照</button>
             </div>
             <div class="row" style="margin-bottom:12px;">
                 <button class="btn" onclick="switchCam()" data-i18n="switchCamBtn">🔄 切换摄像头</button>
@@ -473,7 +473,8 @@ let warnUntil = 0;
 let smooth = null;                   // 骨骼点指数平滑缓存（抑制逐帧抖动）
 let curGrade = null, pendingGrade = null, pendingCount = 0;  // 分级防抖
 let curLang = localStorage.getItem('jp_lang') === 'en' ? 'en' : 'zh';
-let gestureOn = false, gestureHold = 0, gestureCooldown = 0, cdRunning = false;  // 手势拍照 / 倒计时
+let gestureOn = false, gestureCooldown = 0, cdRunning = false;    // OK 手势拍照 / 倒计时
+let handLandmarker = null, handLoading = false, okHold = 0, okLastVT = -1;  // 手部模型与 OK 手势状态
 let fitShown = '';                   // 全身入镜提示状态
 let reports = [];                    // 测量报告（含照片，存 localStorage）
 try { reports = JSON.parse(localStorage.getItem('jp_reports') || '[]'); } catch (e) { reports = []; }
@@ -540,8 +541,10 @@ const I18N = {
         homeC3t: '我的报告',
         homeC3d: '查看历次测量记录与照片，跟踪体态变化趋势。',
         homeFoot: '仅作家庭初筛参考，不构成医学诊断 · 确诊请就医拍 X 光',
-        snapCdBtn: '⏱ 倒计时拍照', snapGesBtn: '✋ 手势拍照', snapGesOn: '✋ 手势拍照 · 开',
-        shotTip: '站远一点让头顶到脚底都入镜：「倒计时拍照」有 3 秒摆姿势时间；「手势拍照」开启后把手举过头顶即可自动拍摄。',
+        snapCdBtn: '⏱ 倒计时拍照', snapGesBtn: '👌 OK手势拍照', snapGesOn: '👌 OK手势拍照 · 开',
+        gestureLoading: '正在加载手势识别模型（约 2MB，首次稍慢）...',
+        gestureFail: '手势识别模型加载失败（网络受限），已关闭手势拍照',
+        shotTip: '站远一点让头顶到脚底都入镜：「倒计时拍照」有 3 秒摆姿势时间；「OK手势拍照」开启后，对镜头比出 OK 手势（拇指食指圈合、中指无名指小指张开）保持约半秒，即自动倒计时拍摄。',
         shotSave: '保存图片', shotClose: '返回实时画面',
         fitHead: '⚠️ 头顶超出画面：请后退一步或把手机放低',
         fitFeet: '⚠️ 脚踝未入镜：请后退一步，直到全身可见',
@@ -614,8 +617,10 @@ const I18N = {
         homeC3t: 'My report',
         homeC3d: 'Review past measurements and photos, and track posture changes over time.',
         homeFoot: 'For family screening only, not a medical diagnosis · See a doctor for an X-ray',
-        snapCdBtn: '⏱ Countdown', snapGesBtn: '✋ Gesture', snapGesOn: '✋ Gesture · ON',
-        shotTip: 'Step back until the whole body from head to feet is in frame. "Countdown" gives you 3s to pose; with "Gesture" on, raising a hand above your head takes the shot automatically.',
+        snapCdBtn: '⏱ Countdown', snapGesBtn: '👌 OK-gesture shot', snapGesOn: '👌 OK-gesture · ON',
+        gestureLoading: 'Loading hand-gesture model (~2MB, first run is slower)...',
+        gestureFail: 'Hand model failed to load (network restricted) — gesture capture turned off',
+        shotTip: 'Step back until the whole body from head to feet is in frame. "Countdown" gives you 3s to pose; with "OK-gesture" on, make an OK sign to the camera (thumb + index circle, other three fingers extended) and hold it for about half a second to start an automatic countdown shot.',
         shotSave: 'Save photo', shotClose: 'Back to live',
         fitHead: '⚠️ Head is out of frame: step back or lower the phone',
         fitFeet: '⚠️ Ankles out of frame: step back until the full body is visible',
@@ -1106,11 +1111,65 @@ window.countdownShot = function () {
     }, 1000);
 };
 window.toggleGesture = function () {
-    gestureOn = !gestureOn;
-    const b = $('gesture-btn');
-    b.classList.toggle('toggled', gestureOn);
-    b.innerText = t(gestureOn ? 'snapGesOn' : 'snapGesBtn');
+    if (!gestureOn) {
+        /* 开启前先确保摄像头与 AI 已启动，并按需加载手部模型 */
+        if (!running && !usingSim) { setStatus('snapFail', true); return; }
+        gestureOn = true;
+        const b = $('gesture-btn');
+        b.classList.add('toggled');
+        b.innerText = t('snapGesOn');
+        if (!handLandmarker && !handLoading && !usingSim) {
+            setStatus('gestureLoading', false);
+            ensureHandModel().then(m => {
+                if (m) setStatus('ready', false);
+            });
+        }
+    } else {
+        gestureOn = false;
+        const b = $('gesture-btn');
+        b.classList.remove('toggled');
+        b.innerText = t('snapGesBtn');
+        if (!statusState.err) setStatus('ready', false);
+    }
 };
+
+/* 按需加载 MediaPipe HandLandmarker（21 个手部关键点），仅在开启手势拍照时下载 */
+async function ensureHandModel() {
+    if (handLandmarker || handLoading) return handLandmarker;
+    handLoading = true;
+    try {
+        const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14');
+        const fileset = await vision.FilesetResolver.forVisionTasks(WASM_BASE);
+        handLandmarker = await vision.HandLandmarker.createFromOptions(fileset, {
+            baseOptions: {
+                modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+                delegate: 'GPU'
+            },
+            runningMode: 'VIDEO', numHands: 1,
+            minHandDetectionConfidence: 0.5, minHandPresenceConfidence: 0.5
+        });
+    } catch (e) {
+        handLandmarker = null;
+        gestureOn = false;
+        const b = $('gesture-btn');
+        b.classList.remove('toggled');
+        b.innerText = t('snapGesBtn');
+        setStatus('gestureFail', true);
+    }
+    handLoading = false;
+    return handLandmarker;
+}
+
+/* OK 手势判定（几何特征，与镜像无关）：
+   ① 拇指尖(4)与食指尖(8)捏合 —— 距离 < 手掌尺度(腕0→中指根9) 的 0.45 倍
+   ② 中指(12)/无名指(16)/小指(20)张开 —— 指尖到腕的距离明显大于对应第二指节(10/14/18) */
+function isOkGesture(h) {
+    const d = (a, b) => Math.hypot(h[a].x - h[b].x, h[a].y - h[b].y);
+    const scale = d(0, 9) || 1e-6;
+    const pinch = d(4, 8) / scale;
+    const extended = [[12, 10], [16, 14], [20, 18]].every(([tip, pip]) => d(tip, 0) > d(pip, 0) * 1.05);
+    return pinch < 0.45 && extended;
+}
 window.saveShot = function () {
     const a = document.createElement('a');
     a.href = $('shot-img').src;
@@ -1140,6 +1199,29 @@ function loop() {
 
 function draw(res) {
     ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+    /* ---- OK 手势拍照：独立于体态识别，未检出全身时也可触发 ---- */
+    if (gestureOn && handLandmarker && !usingSim && !cdRunning && video.currentTime !== okLastVT) {
+        okLastVT = video.currentTime;
+        try {
+            const hr = handLandmarker.detectForVideo(video, performance.now());
+            const h = hr.landmarks && hr.landmarks[0];
+            const nowMs = Date.now();
+            if (h && isOkGesture(h) && nowMs > gestureCooldown) {
+                okHold++;
+                if (okHold >= 15) {          // 保持约 0.5 秒，防止瞬间误触
+                    okHold = 0;
+                    gestureCooldown = nowMs + 8000;   // 冷却 8s，避免连续误拍
+                    countdownShot();
+                }
+            } else {
+                okHold = 0;
+            }
+        } catch (e) { /* 单帧推理失败忽略即可 */ }
+    } else if (!gestureOn || cdRunning) {
+        okHold = 0;
+    }
+
     const lm0 = res.landmarks && res.landmarks[0];
     if (!lm0) { smooth = null; return; }
 
@@ -1199,25 +1281,6 @@ function draw(res) {
 
     /* ---- 全身入镜检测：头顶 / 脚踝是否出画，实时提示站位 ---- */
     updateFit(lm);
-
-    /* ---- 手势拍照：单手举过头顶保持约 0.6 秒 → 自动进入 3 秒倒计时 ---- */
-    if (gestureOn && mode === 'screen' && !usingSim && !cdRunning) {
-        const handL = (lm[15].visibility ?? 1) > 0.4 && lm[15].y < nose.y - 0.06;
-        const handR = (lm[16].visibility ?? 1) > 0.4 && lm[16].y < nose.y - 0.06;
-        const nowMs = Date.now();
-        if ((handL || handR) && nowMs > gestureCooldown) {
-            gestureHold++;
-            if (gestureHold >= 18) {          // ~0.6s @30fps
-                gestureHold = 0;
-                gestureCooldown = nowMs + 8000;   // 冷却 8s，避免连续误拍
-                countdownShot();
-            }
-        } else {
-            gestureHold = 0;
-        }
-    } else {
-        gestureHold = 0;
-    }
 
     /* ---- 按当前体位更新指标 UI（数值实时刷新，分级需连续 4 帧确认防闪烁） ---- */
     {
