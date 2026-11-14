@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>脊正 · 体态筛查 | SpineCare Posture Screening</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; }
+    body {
+        font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        background: #f5faf8; color: #23423c;
+        display: flex; justify-content: center;
+    }
+    .app { width: 100%; max-width: 480px; min-height: 100%; display: flex; flex-direction: column; position: relative; }
+
+    /* ===== 顶栏 ===== */
+    .topbar {
+        background: #2c5e55; color: #fff; padding: 14px 18px;
+        display: flex; justify-content: space-between; align-items: center;
+        position: sticky; top: 0; z-index: 10;
+    }
+    .topbar .brand { font-size: 17px; font-weight: 700; letter-spacing: 1px; }
+    .topbar .brand small { display: block; font-size: 10px; font-weight: 400; opacity: .75; letter-spacing: 2px; }
+    .top-right { display: flex; align-items: center; gap: 8px; }
+    .qi { font-size: 13px; background: rgba(255,255,255,.16); padding: 6px 12px; border-radius: 999px; white-space: nowrap; }
+    .qi b { color: #ffe08a; }
+    .lang {
+        font-size: 12px; font-weight: 700; padding: 6px 11px; border-radius: 999px;
+        background: rgba(255,255,255,.9); color: #2c5e55; cursor: pointer; white-space: nowrap;
+    }
+
+    /* ===== 状态条 ===== */
+    .model-status {
+        font-size: 12px; padding: 8px 18px; background: #e0f2f1; color: #2c5e55;
+        display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    }
+    .model-status.err { background: #fdecea; color: #c0392b; }
+    .model-status button {
+        border: none; background: #2c5e55; color: #fff; font-size: 12px;
+        padding: 4px 10px; border-radius: 8px; cursor: pointer; white-space: nowrap;
+    }
+
+    /* ===== 体位切换条（背面→侧面→前屈） ===== */
+    .pose-steps { display: flex; gap: 8px; padding: 10px 10px 0; }
+    .ps {
+        flex: 1; background: #fff; border: 1.5px solid #e3efeb; border-radius: 10px;
+        text-align: center; font-size: 12px; color: #4f6a63; cursor: pointer; padding: 7px 4px;
+        line-height: 1.35;
+    }
+    .ps b { display: block; font-size: 15px; margin-bottom: 2px; color: #9db4ae; }
+    .ps.on { border-color: #2c5e55; background: #f2faf7; color: #2c5e55; font-weight: 700; }
+    .ps.on b { color: #2c5e55; }
+
+    /* ===== 画面行：左侧评估卡 + 右侧竖幅显示框 ===== */
+    .cam-row { display: flex; gap: 10px; padding: 10px 10px 0; align-items: stretch; }
+    .cam-side { width: 37%; display: flex; flex-direction: column; }
+    .cam-side .card { margin-bottom: 0; flex: 1; }
+    .cam-side h4 { font-size: 13px; }
+    .cam-side .metric { padding: 3px 0; }
+    .cam-side .metric b { font-size: 13.5px; }
+    .cam-side .levels { flex-direction: column; gap: 5px; margin-top: 8px; }
+
+    /* 取景框：竖向约 9:16（高/宽）。双保险：
+       1) aspect-ratio 适用于新内核；2) ::before padding-top 撑高适用于所有老内核，
+       两者结果一致，纯 CSS 由布局宽度推导，不依赖 JS 时序 */
+    .stage { position: relative; flex: 1; min-width: 0; aspect-ratio: 9 / 16; background: #0c1513; overflow: hidden; }
+    .stage::before { content: ""; display: block; padding-top: 177.78%; }
+    .stage video, .stage canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+    .stage video.mirror, .stage canvas.mirror { transform: scaleX(-1); }
+    .stage .sim-overlay {
+        position: absolute; inset: 0; display: none;
+        justify-content: center; align-items: center;
+    }
+    .skeleton-ring {
+        width: 110px; height: 210px; border: 2px dashed rgba(126,224,194,.9);
+        border-radius: 60px; position: relative;
+    }
+    .skeleton-ring i {
+        position: absolute; width: 9px; height: 9px; border-radius: 50%;
+        background: #7ee0c2; box-shadow: 0 0 8px #7ee0c2; animation: pulse 1.4s ease-in-out infinite;
+    }
+    .skeleton-ring i:nth-child(1) { top: 4px; left: 18px; }
+    .skeleton-ring i:nth-child(2) { top: 4px; right: 18px; }
+    .skeleton-ring i:nth-child(3) { top: 46%; left: 50%; transform: translateX(-50%); }
+    .skeleton-ring i:nth-child(4) { bottom: 14px; left: 24px; }
+    .skeleton-ring i:nth-child(5) { bottom: 14px; right: 24px; }
+    @keyframes pulse { 0%,100% { opacity: .4; } 50% { opacity: 1; } }
+    .sim-text { position: absolute; bottom: 14px; width: 100%; text-align: center; color: rgba(255,255,255,.7); font-size: 12px; }
+
+    /* 实时指标浮层（标签/数值各占一行，数值等宽防抖动） */
+    .live-metrics {
+        position: absolute; left: 10px; top: 10px; z-index: 5;
+        background: rgba(12,21,19,.72); border-radius: 12px; padding: 8px 12px;
+        color: #fff; backdrop-filter: blur(4px); min-width: 150px;
+    }
+    .live-metrics .lm { margin-bottom: 5px; }
+    .live-metrics .lm:last-child { margin-bottom: 0; }
+    .live-metrics .lm span { display: block; font-size: 10px; opacity: .75; line-height: 1.3; }
+    .live-metrics .lm b { display: block; font-size: 13.5px; font-weight: 700; line-height: 1.35; font-variant-numeric: tabular-nums; }
+    .grade-chip {
+        position: absolute; right: 10px; top: 10px; z-index: 5;
+        padding: 8px 12px; border-radius: 999px; color: #fff; font-size: 13.5px; font-weight: 700;
+        background: #22c55e; letter-spacing: .5px; min-width: 64px; text-align: center;
+    }
+    .ai-warn {
+        position: absolute; left: 10px; right: 10px; top: 52px; z-index: 6;
+        background: rgba(231,76,60,.95); color: #fff; padding: 10px 14px;
+        border-radius: 12px; font-size: 13.5px; font-weight: 600; display: none;
+        animation: shake .5s ease;
+    }
+    @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+    .rep-badge {
+        position: absolute; right: 10px; bottom: 10px; z-index: 5;
+        background: rgba(44,94,85,.9); color: #fff; border-radius: 14px;
+        padding: 10px 16px; font-size: 12px; text-align: center; display: none;
+    }
+    .rep-badge b { display: block; font-size: 26px; color: #ffe08a; }
+
+    /* 站位引导框 */
+    .guide {
+        position: absolute; left: 0; right: 0; top: 6%; margin: auto;
+        height: 80%; z-index: 4; pointer-events: none;
+    }
+    .guide-hint {
+        position: absolute; bottom: 46px; left: 8px; right: 8px; z-index: 4;
+        text-align: center; color: rgba(126,224,194,.95); font-size: 12px; line-height: 1.5;
+        text-shadow: 0 1px 4px rgba(0,0,0,.6); pointer-events: none;
+    }
+
+    /* ===== 主体 ===== */
+    .body { flex: 1; padding: 14px 14px 86px; }
+    .card { background: #fff; border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; border: 1px solid #e3efeb; }
+    .card h4 { font-size: 14px; color: #2c5e55; margin-bottom: 8px; }
+    .metric { display: block; color: #4f6a63; padding: 5px 0; }
+    .metric span { display: block; font-size: 11px; color: #8aa39c; line-height: 1.4; }
+    .metric b { display: block; font-weight: 700; color: #23423c; font-size: 15px; line-height: 1.3; font-variant-numeric: tabular-nums; }
+    .rule { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: #4f6a63; padding: 5px 0; }
+    .rule b { font-weight: 600; color: #23423c; text-align: right; font-size: 12.5px; }
+    .levels { display: flex; gap: 8px; margin-top: 8px; }
+    .level { flex: 1; text-align: center; font-size: 11.5px; padding: 7px 2px; border-radius: 10px; opacity: .45; }
+    .level.on { opacity: 1; font-weight: 700; }
+    .level.g { background: #e8f5e9; color: #2e7d32; }
+    .level.y { background: #fff3e0; color: #ef6c00; }
+    .level.r { background: #fdecea; color: #c0392b; }
+    .row { display: flex; gap: 8px; }
+    .btn {
+        flex: 1; border: none; border-radius: 12px; padding: 12px 6px; font-size: 13px;
+        font-weight: 600; cursor: pointer; color: #fff; background: #d4a373; letter-spacing: .5px;
+    }
+    .btn.primary { background: #2c5e55; }
+    .btn.danger { background: #e74c3c; }
+    .btn:disabled { opacity: .5; }
+    .snap-list { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0; }
+    .snap-list:empty::after { content: '暂无拍照记录，点击上方「拍照」采集'; font-size: 12px; color: #9db4ae; }
+    body.lang-en .snap-list:empty::after { content: 'No captures yet — tap "Capture" above'; }
+    .snap { flex-shrink: 0; width: 86px; }
+    .snap img { width: 86px; height: 108px; object-fit: cover; border-radius: 10px; border: 1px solid #e3efeb; }
+    .snap span { font-size: 10px; color: #7c938d; display: block; margin-top: 3px; text-align: center; }
+    .exercise-pick { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .ex {
+        flex: 0 0 31.5%; background: #fff; border: 1.5px solid #e3efeb; border-radius: 12px;
+        padding: 9px 4px; text-align: center; font-size: 12px; color: #4f6a63; cursor: pointer;
+        line-height: 1.3;
+    }
+    .ex .em { font-size: 20px; display: block; margin-bottom: 3px; }
+    .ex.on { border-color: #2c5e55; background: #f2faf7; color: #2c5e55; font-weight: 700; }
+    .note { font-size: 12px; color: #9db4ae; line-height: 1.7; }
+    input[type=text] {
+        width: 100%; border: 1px solid #e3efeb; border-radius: 10px; padding: 10px;
+        font-size: 12px; margin: 6px 0;
+    }
+
+    /* ===== 底部导航 ===== */
+    .tabbar {
+        position: fixed; bottom: 0; width: 100%; max-width: 480px; height: 62px;
+        background: #fff; border-top: 1px solid #e3efeb; display: flex; z-index: 10;
+    }
+    .tab {
+        flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center;
+        font-size: 11px; color: #9db4ae; gap: 3px; cursor: pointer;
+    }
+    .tab .ic { font-size: 20px; }
+    .tab.on { color: #2c5e55; font-weight: 700; }
+    .view { display: none; }
+    .view.on { display: block; }
+</style>
+</head>
+<body>
+<div class="app">
+    <div class="topbar">
+        <div class="brand"><span id="brand-name">脊正 · 真机版</span><small>SPINECARE AI · V9</small></div>
+        <div class="top-right">
+            <div class="qi"><span data-i18n="qiLabel">正气值</span> <b id="qi">0</b></div>
+            <div class="lang" id="lang-btn" onclick="toggleLang()">EN</div>
+        </div>
+    </div>
+    <div class="model-status" id="status">
+        <span id="status-text" data-i18n="statusIdle">AI 引擎未启动</span>
+        <button id="start-btn" onclick="startEngine()" data-i18n="startBtn">启动摄像头与 AI</button>
+    </div>
+
+    <div class="pose-steps">
+        <div class="ps on" id="ps-back" onclick="pickPose('back')"><b>1</b><span data-i18n="poseBack">背面站立</span></div>
+        <div class="ps" id="ps-side" onclick="pickPose('side')"><b>2</b><span data-i18n="poseSide">侧面站立</span></div>
+        <div class="ps" id="ps-bend" onclick="pickPose('bend')"><b>3</b><span data-i18n="poseBend">前屈试验</span></div>
+    </div>
+
+    <div class="cam-row">
+        <div class="cam-side">
+            <div class="card">
+                <h4 id="r-title">实时体态评估 · 背面站立</h4>
+                <div class="metric"><span id="r-l1">高低肩角度</span><b id="r-v1">--</b></div>
+                <div class="metric"><span id="r-l2">骨盆倾斜角度</span><b id="r-v2">--</b></div>
+                <div class="metric"><span id="r-l3">头部相对偏移</span><b id="r-v3">--</b></div>
+                <div class="levels">
+                    <div class="level g on" id="lv-g" data-i18n="lvG">绿 · 正常</div>
+                    <div class="level y" id="lv-y" data-i18n="lvY">黄 · 观察</div>
+                    <div class="level r" id="lv-r" data-i18n="lvR">红 · 建议就医</div>
+                </div>
+                <p class="note" id="r-note" style="margin-top:8px;"></p>
+            </div>
+        </div>
+        <div class="stage">
+        <video id="video" playsinline muted autoplay></video>
+        <canvas id="overlay"></canvas>
+        <div class="sim-overlay" id="sim"><div class="skeleton-ring"><i></i><i></i><i></i><i></i><i></i></div><div class="sim-text" data-i18n="simMode">模拟模式（未启用摄像头）</div></div>
+        <div class="live-metrics" id="live">
+            <div class="lm"><span id="m-l1">高低肩</span><b id="m-v1">--</b></div>
+            <div class="lm"><span id="m-l2">骨盆倾斜</span><b id="m-v2">--</b></div>
+            <div class="lm"><span id="m-l3">头部偏移</span><b id="m-v3">--</b></div>
+        </div>
+        <div class="grade-chip" id="grade">--</div>
+        <div class="ai-warn" id="warn"></div>
+        <div class="rep-badge" id="rep"><b id="rep-num">0</b><span id="rep-label">双手托天 · 次</span></div>
+        <svg class="guide" viewBox="0 0 120 230" fill="none">
+            <circle cx="60" cy="24" r="15" stroke="rgba(126,224,194,.75)" stroke-width="2" stroke-dasharray="6 5" fill="rgba(126,224,194,.06)"/>
+            <path d="M43 46 h34 c9 0 15 7 15 16 v52 c0 7 -5 12 -11 12 h-3 v90 c0 6 -5 11 -11 11 h-3 c-5 0 -9 -4 -9 -9 l-3 -55 -3 55 c0 5 -4 9 -9 9 h-3 c-6 0 -11 -5 -11 -11 v-90 h-3 c-6 0 -11 -5 -11 -12 v-52 c0 -9 6 -16 15 -16 z"
+                  stroke="rgba(126,224,194,.75)" stroke-width="2" stroke-dasharray="6 5" fill="rgba(126,224,194,.05)"/>
+        </svg>
+        <div class="guide-hint" id="hint">请让孩子站入轮廓内 · 背部对准镜头 · 全身入镜</div>
+        </div><!-- /stage -->
+    </div><!-- /cam-row -->
+
+    <div class="body">
+        <!-- 筛查视图 -->
+        <div id="view-screen" class="view on">
+            <div class="row" style="margin-bottom:12px;">
+                <button class="btn primary" onclick="snapshot()" data-i18n="snapBtn">📸 拍照</button>
+                <button class="btn" onclick="switchCam()" data-i18n="switchCamBtn">🔄 切换摄像头</button>
+                <button class="btn" onclick="calibPose()" data-i18n="calibBtn">⚖️ 零位校准</button>
+            </div>
+            <p class="note" style="margin:-6px 0 12px;" data-i18n="calibTip"></p>
+            <div class="card">
+                <h4 data-i18n="snapCard">拍照记录（复筛对比用）</h4>
+                <div class="snap-list" id="snaps"></div>
+            </div>
+        </div>
+
+        <!-- 跟练视图 -->
+        <div id="view-train" class="view">
+            <div class="exercise-pick">
+                <div class="ex on" id="ex1" onclick="pickEx(1)"><span class="em">🙌</span><span data-i18n="ex1">双手托天</span></div>
+                <div class="ex" id="ex2" onclick="pickEx(2)"><span class="em">🧘</span><span data-i18n="ex2">沉肩静站</span></div>
+                <div class="ex" id="ex3" onclick="pickEx(3)"><span class="em">🐬</span><span data-i18n="ex3">小燕飞背伸</span></div>
+                <div class="ex" id="ex4" onclick="pickEx(4)"><span class="em">🐈</span><span data-i18n="ex4">猫式伸展</span></div>
+                <div class="ex" id="ex5" onclick="pickEx(5)"><span class="em">👼</span><span data-i18n="ex5">靠墙天使</span></div>
+            </div>
+            <div class="card">
+                <h4 data-i18n="rulesTitle">AI 实时纠错规则</h4>
+                <div id="rules"></div>
+            </div>
+            <p class="note" data-i18n="trainNote"></p>
+        </div>
+
+        <!-- 关于视图 -->
+        <div id="view-about" class="view">
+            <div class="card">
+                <h4 data-i18n="aboutTitle">运行说明</h4>
+                <p class="note" data-i18n-html="aboutText"></p>
+            </div>
+            <div class="card">
+                <h4 data-i18n="modelTitle">模型源（国内网络不通时可替换镜像地址）</h4>
+                <input type="text" id="model-url" data-i18n-ph="modelPh" placeholder="粘贴 pose_landmarker_lite.task 镜像 URL">
+                <button class="btn primary" onclick="saveModelUrl()" data-i18n="saveRestart">保存并重启 AI</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="tabbar">
+        <div class="tab on" onclick="switchTab(0)"><span class="ic">📸</span><span data-i18n="tabScreen">筛查</span></div>
+        <div class="tab" onclick="switchTab(1)"><span class="ic">🧘</span><span data-i18n="tabTrain">跟练</span></div>
+        <div class="tab" onclick="switchTab(2)"><span class="ic">ℹ️</span><span data-i18n="tabAbout">说明</span></div>
+    </div>
+</div>
+
+<script type="module">
+const $ = id => document.getElementById(id);
+const status = $('status'), statusText = $('status-text'), startBtn = $('start-btn');
+const video = $('video'), overlay = $('overlay'), ctx = overlay.getContext('2d');
+
+/* 取景框尺寸完全由 CSS 控制（aspect-ratio + ::before padding 双保险），不再用 JS 设高 */
+
+/* ---------- 全局状态 ---------- */
+let landmarker = null, running = false, lastVideoTime = -1;
+let camFacing = localStorage.getItem('jp_facing') || 'user', usingSim = false;
+let mode = 'screen';                 // screen | train
+let screenPose = 'back';             // back | side | bend
+let exMode = 1;                      // 1 托天 | 2 沉站 | 3 小燕飞 | 4 猫式 | 5 靠墙天使
+let reps = 0, wasRaised = false, wasLifted = false, catPhase = 'none', qi = +(localStorage.getItem('jp_qi') || 0);
+let warnUntil = 0;
+let smooth = null;                   // 骨骼点指数平滑缓存（抑制逐帧抖动）
+let curGrade = null, pendingGrade = null, pendingCount = 0;  // 分级防抖
+let curLang = localStorage.getItem('jp_lang') === 'en' ? 'en' : 'zh';
+
+const MODEL_DEFAULT = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+const WASM_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm';
+const CONN = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28],[0,11],[0,12]];
+
+/* ================= 多语言资源 ================= */
+const I18N = {
+    zh: {
+        brand: '脊正 · 真机版',
+        qiLabel: '正气值',
+        startBtn: '启动摄像头与 AI',
+        statusIdle: 'AI 引擎未启动',
+        starting: '正在启动摄像头...',
+        downloading: '正在下载 AI 模型（约 5MB，首次稍慢）...',
+        ready: 'AI 引擎已就绪 · 端侧推理中',
+        switching: '正在切换摄像头...',
+        switchedPre: '已切换到前置摄像头 · 端侧推理中',
+        switchedPost: '已切换到后置摄像头 · 端侧推理中',
+        noFront: '该设备无前置摄像头，已保持原摄像头',
+        noRear: '该设备无后置摄像头，已保持原摄像头',
+        camFail: '摄像头不可用（需 HTTPS 环境或已拒绝授权），已切换模拟模式',
+        modelFail: '模型下载失败（网络受限），已切换模拟模式。可在「说明」页替换镜像地址',
+        switchFail: '摄像头切换失败',
+        simMode: '模拟模式（未启用摄像头）',
+        poseBack: '背面站立', poseSide: '侧面站立', poseBend: '前屈试验',
+        lvG: '绿 · 正常', lvY: '黄 · 观察', lvR: '红 · 建议就医',
+        evalTitle: '实时体态评估',
+        snapBtn: '📸 拍照', switchCamBtn: '🔄 切换摄像头', calibBtn: '⚖️ 零位校准',
+        calibTip: '校准方法：让孩子摆好标准姿势（如背面对镜头自然站直）→ 点「零位校准」→ 之后的数值即为相对变化量，可消除手机拿歪和个体自然不对称的影响。重新校准随时可做。',
+        calibNoBend: '前屈体位无需校准（校准适用于背面/侧面站立）',
+        calibNoAI: '请先启动 AI 并让人物入镜后再校准',
+        calibOk: '已记录「{p}」零位，后续数值为相对变化量',
+        snapCard: '拍照记录（复筛对比用）',
+        gradeG: '正常', gradeY: '观察', gradeR: '就医',
+        bendOk: '已到位', bendMore: '再弯一点', bendGo: '请弯腰',
+        ex1: '双手托天', ex2: '沉肩静站', ex3: '小燕飞背伸', ex4: '猫式伸展', ex5: '靠墙天使',
+        rep1: '双手托天 · 次', rep3: '小燕飞 · 次', rep4: '猫式伸展 · 次', rep5: '靠墙天使 · 次',
+        rulesTitle: 'AI 实时纠错规则',
+        rules: [
+            ['双手托天', '手腕过鼻尖计 1 次'],
+            ['小燕飞', '俯卧躯干抬起 ≥20° 计 1 次'],
+            ['猫式伸展', '低头→抬头一个来回计 1 次'],
+            ['靠墙天使', '手臂上滑过头回落计 1 次'],
+            ['离墙检测', '手腕离墙过远 → 贴墙滑动'],
+            ['耸肩检测', '肩耳距过近 → 沉肩坠肘'],
+            ['歪斜检测', '高低肩 ≥6° → 身体回正']
+        ],
+        trainNote: '提示：小燕飞 / 猫式伸展请让孩子侧对镜头做；靠墙天使背对镜头、手臂贴墙上滑。训练时整个人进入画面（摄像头能看到肩、髋），AI 才能稳定识别。每次完成动作 +5 正气值。',
+        aboutTitle: '运行说明',
+        aboutText: '· 本页使用 MediaPipe Pose Landmarker 在浏览器端侧推理，画面不会上传服务器。<br>· 摄像头要求 HTTPS 或 localhost 环境；在手机上请通过 https 链接打开。<br>· 首次启动需联网下载约 5MB 模型，之后浏览器会缓存。<br>· 判定结果仅供家庭初筛参考，确诊请到医院骨科拍 X 光。',
+        modelTitle: '模型源（国内网络不通时可替换镜像地址）',
+        modelPh: '粘贴 pose_landmarker_lite.task 镜像 URL',
+        saveRestart: '保存并重启 AI',
+        tabScreen: '筛查', tabTrain: '跟练', tabAbout: '说明',
+        warnShrug: '⚠️ 检测到耸肩！请沉肩坠肘，放松斜方肌',
+        warnShrug2: '⚠️ 检测到耸肩！请沉肩坠肘，配合深呼吸',
+        warnTilt: '⚠️ 身体歪斜 {v}°，请回正再继续',
+        warnLift: '⚠️ 抬起过高！用上背部发力即可，保护腰椎',
+        warnWall: '⚠️ 手腕离开墙面！请让手臂贴墙滑动'
+    },
+    en: {
+        brand: 'SpineCare · Live Demo',
+        qiLabel: 'Qi points',
+        startBtn: 'Start camera & AI',
+        statusIdle: 'AI engine not started',
+        starting: 'Starting camera...',
+        downloading: 'Downloading AI model (~5MB, first run is slower)...',
+        ready: 'AI engine ready · on-device inference',
+        switching: 'Switching camera...',
+        switchedPre: 'Switched to front camera · on-device inference',
+        switchedPost: 'Switched to rear camera · on-device inference',
+        noFront: 'No front camera on this device; kept the current camera',
+        noRear: 'No rear camera on this device; kept the current camera',
+        camFail: 'Camera unavailable (HTTPS required or permission denied). Switched to simulation mode.',
+        modelFail: 'Model download failed (network restricted). Switched to simulation — you can set a mirror URL on the Info tab.',
+        switchFail: 'Camera switch failed',
+        simMode: 'Simulation mode (camera off)',
+        poseBack: 'Back view', poseSide: 'Side view', poseBend: 'Forward bend',
+        lvG: 'Green · Normal', lvY: 'Amber · Watch', lvR: 'Red · See doctor',
+        evalTitle: 'Live posture assessment',
+        snapBtn: '📸 Capture', switchCamBtn: '🔄 Switch cam', calibBtn: '⚖️ Zero-calibrate',
+        calibTip: 'To calibrate: have the child hold the standard pose (standing naturally with back to the camera), then tap "Zero-calibrate". Values afterwards are relative changes, which cancels out phone tilt and the child\'s natural asymmetry. Recalibrate any time.',
+        calibNoBend: 'No calibration needed for the forward-bend pose',
+        calibNoAI: 'Start the AI with a person in frame first',
+        calibOk: 'Zero point saved for "{p}". Values are now relative changes.',
+        snapCard: 'Captures (for re-screening comparison)',
+        gradeG: 'Normal', gradeY: 'Watch', gradeR: 'Doctor',
+        bendOk: 'Good', bendMore: 'Bend more', bendGo: 'Bend forward',
+        ex1: 'Arm raise', ex2: 'Shoulder release', ex3: 'Back extension', ex4: 'Cat-cow stretch', ex5: 'Wall angel',
+        rep1: 'Arm raise · reps', rep3: 'Back extension · reps', rep4: 'Cat-cow · reps', rep5: 'Wall angel · reps',
+        rulesTitle: 'Real-time correction rules',
+        rules: [
+            ['Arm raise', 'Wrist above nose = 1 rep'],
+            ['Back extension', 'Torso lift ≥20° = 1 rep'],
+            ['Cat-cow', 'Head down → up = 1 rep'],
+            ['Wall angel', 'Arm slide up and down = 1 rep'],
+            ['Wall contact', 'Wrist off wall → slide along the wall'],
+            ['Shrug check', 'Shoulder too close to ear → relax'],
+            ['Tilt check', 'Shoulder tilt ≥6° → straighten up']
+        ],
+        trainNote: 'Tip: do the back extension and cat-cow side-on to the camera; for the wall angel, face away from the camera and slide your arms along the wall. Keep the whole body in frame (shoulders and hips visible) for stable detection. Each rep earns +5 Qi points.',
+        aboutTitle: 'How it works',
+        aboutText: '· Runs MediaPipe Pose Landmarker on-device in your browser; video never leaves the phone.<br>· The camera requires HTTPS or localhost — open the https link on your phone.<br>· The first launch downloads a ~5MB model, then the browser caches it.<br>· Results are for family screening only. For diagnosis, see a doctor and take an X-ray.',
+        modelTitle: 'Model source (set a mirror URL if blocked)',
+        modelPh: 'Paste a mirror URL for pose_landmarker_lite.task',
+        saveRestart: 'Save & restart AI',
+        tabScreen: 'Screen', tabTrain: 'Train', tabAbout: 'Info',
+        warnShrug: '⚠️ Shoulders raised! Relax and let them drop',
+        warnShrug2: '⚠️ Shoulders raised! Drop them and breathe slowly',
+        warnTilt: '⚠️ Body tilted {v}° — straighten up',
+        warnLift: '⚠️ Too high — use your upper back and protect the lumbar spine',
+        warnWall: '⚠️ Wrists off the wall — slide along the wall'
+    }
+};
+const t = k => (I18N[curLang][k] !== undefined ? I18N[curLang][k] : k);
+const tf = (k, arg) => t(k).replace('{p}', arg).replace('{v}', arg);
+
+/* ---------- 体位配置：每套体位独立指标 + 独立判定口径（中英双语） ---------- */
+const POSES = {
+    back: {
+        nameKey: 'poseBack',
+        labels: { zh: ['高低肩角度', '骨盆倾斜角度', '头部相对偏移'], en: ['Shoulder tilt', 'Pelvic tilt', 'Head offset'] },
+        live: { zh: ['高低肩', '骨盆倾斜', '头部偏移'], en: ['Shoulder', 'Pelvis', 'Head'] },
+        hint: { zh: '请让孩子站入轮廓内 · 背部对准镜头 · 全身入镜', en: 'Stand inside the outline · Back to camera · Full body in frame' },
+        note: {
+            zh: '判定口径：高低肩/骨盆 ≥2.5° 转黄、≥6° 转红；仅作家庭初筛参考，不构成诊断。',
+            en: 'Thresholds: shoulder/pelvic tilt ≥2.5° amber, ≥6° red. Family screening only, not a diagnosis.'
+        },
+        calc(v) {
+            const headShift = (v.nose.x - v.shM.x) / v.shW * 100;
+            return {
+                vals: [
+                    v.deg(Math.atan2(Math.abs(v.ls.y - v.rs.y), Math.abs(v.rs.x - v.ls.x))),
+                    v.deg(Math.atan2(Math.abs(v.lh.y - v.rh.y), Math.abs(v.rh.x - v.lh.x))),
+                    (headShift > 0 ? '+' : '') + headShift.toFixed(0) + '%'
+                ],
+                g: v.maxTilt >= 6 ? 'r' : v.maxTilt >= 2.5 ? 'y' : 'g'
+            };
+        }
+    },
+    side: {
+        nameKey: 'poseSide',
+        labels: { zh: ['头前伸角度', '躯干前倾角度', '垂线偏移'], en: ['Forward head', 'Trunk lean', 'Plumb offset'] },
+        live: { zh: ['头前伸', '躯干前倾', '垂线偏移'], en: ['Head', 'Trunk', 'Plumb'] },
+        hint: { zh: '请侧身对准镜头 · 自然站立 · 全身入镜', en: 'Stand side-on to the camera · Natural posture · Full body in frame' },
+        note: {
+            zh: '判定口径：头前伸 ≥12° 转黄、≥20° 转红；躯干前倾 ≥10° 转黄。仅作初筛参考，不构成诊断。',
+            en: 'Thresholds: forward head ≥12° amber, ≥20° red; trunk lean ≥10° amber. Screening only, not a diagnosis.'
+        },
+        calc(v) {
+            const headA = Math.atan2(Math.abs(v.earM.x - v.shM.x), Math.max(1e-6, v.shM.y - v.earM.y)) * 180 / Math.PI;
+            const trunkA = Math.atan2(Math.abs(v.shM.x - v.hpM.x), Math.max(1e-6, v.shM.y - v.hpM.y)) * 180 / Math.PI;
+            const ankM = { x: (v.lm[27].x + v.lm[28].x) / 2 };
+            const plumb = Math.abs(v.earM.x - ankM.x) / v.torsoLen * 100;
+            let g = 'g';
+            if (headA >= 20 || trunkA >= 15) g = 'r';
+            else if (headA >= 12 || trunkA >= 10) g = 'y';
+            return { vals: [v.deg(headA), v.deg(trunkA), plumb.toFixed(0) + '%'], g };
+        }
+    },
+    bend: {
+        nameKey: 'poseBend',
+        labels: { zh: ['弯腰角度', '背部对称偏移', '动作到位度'], en: ['Bend angle', 'Back asymmetry', 'Form check'] },
+        live: { zh: ['弯腰角度', '背部对称', '到位度'], en: ['Bend', 'Asymmetry', 'Form'] },
+        hint: { zh: '请弯腰约 90° · 背部对准镜头 · 手臂放松下垂', en: 'Bend forward about 90° · Back to camera · Arms hanging loose' },
+        note: {
+            zh: '判定口径：背部对称偏移 ≥5% 转黄、≥10% 转红（剃刀背提示）。摄像头无深度传感器，仅作初筛参考，确诊请就医拍 X 光。',
+            en: 'Thresholds: back asymmetry ≥5% amber, ≥10% red (rib-hump hint). No depth sensor — screening only; see a doctor for an X-ray.'
+        },
+        calc(v) {
+            const dy = Math.max(1e-6, v.hpM.y - v.shM.y);
+            const dz = Math.abs(v.shM.z - v.hpM.z);
+            const bendA = Math.atan2(dz, dy) * 180 / Math.PI;   // 0° 直立 → 约 90° 水平
+            const asymY = Math.abs(v.ls.y - v.rs.y) / v.shW * 100;
+            const asymZ = Math.abs(v.ls.z - v.rs.z) / v.shW * 100;
+            const asym = Math.max(asymY, asymZ);
+            return {
+                vals: [v.deg(bendA), asym.toFixed(0) + '%', bendA >= 70 ? t('bendOk') : bendA >= 40 ? t('bendMore') : t('bendGo')],
+                g: asym >= 10 ? 'r' : asym >= 5 ? 'y' : 'g'
+            };
+        }
+    }
+};
+
+/* ---------- 界面语言应用 ---------- */
+function applyPoseTexts() {
+    const P = POSES[screenPose];
+    $('r-title').innerText = t('evalTitle') + ' · ' + t(P.nameKey);
+    ['1', '2', '3'].forEach((i, k) => {
+        $('r-l' + i).innerText = P.labels[curLang][k];
+        $('m-l' + i).innerText = P.live[curLang][k];
+    });
+    $('hint').innerText = P.hint[curLang];
+    $('r-note').innerText = P.note[curLang];
+}
+function renderRules() {
+    $('rules').innerHTML = t('rules').map(r => `<div class="rule"><span>${r[0]}</span><b>${r[1]}</b></div>`).join('');
+}
+function gradeWord(g) { return g === 'g' ? t('gradeG') : g === 'y' ? t('gradeY') : t('gradeR'); }
+function renderGrade() {
+    if (!curGrade) return;
+    $('grade').innerText = gradeWord(curGrade);
+}
+function applyLang() {
+    document.documentElement.lang = curLang === 'zh' ? 'zh-CN' : 'en';
+    document.body.classList.toggle('lang-en', curLang === 'en');
+    document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+    document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
+    document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+    $('brand-name').innerText = t('brand');
+    $('lang-btn').innerText = curLang === 'zh' ? 'EN' : '中文';
+    renderRules();
+    applyPoseTexts();
+    renderStatus();
+    renderGrade();
+    $('rep-label').innerText = exMode === 2 ? '' : t('rep' + exMode);
+}
+window.toggleLang = function () {
+    curLang = curLang === 'zh' ? 'en' : 'zh';
+    localStorage.setItem('jp_lang', curLang);
+    applyLang();
+};
+
+/* ---------- 状态条（多语言） ---------- */
+let statusState = { key: 'statusIdle', err: false, arg: '' };
+function setStatus(key, isErr, arg) {
+    statusState = { key, err: !!isErr, arg: arg || '' };
+    renderStatus();
+}
+function renderStatus() {
+    statusText.innerText = statusState.arg ? tf(statusState.key, statusState.arg) : t(statusState.key);
+    status.classList.toggle('err', statusState.err);
+    if (statusState.err) startBtn.disabled = false;
+}
+
+/* ---------- 零位校准：扣除手机拿歪的倾斜量与孩子个体的自然基线 ---------- */
+let calib = {};
+try { calib = JSON.parse(localStorage.getItem('jp_calib') || '{}'); } catch (e) { calib = {}; }
+let lastVals = null;   // 最近一帧的原始读数（供校准取样）
+const numIn = s => { const m = String(s).match(/-?\d+\.?\d*/); return m ? parseFloat(m[0]) : null; };
+window.calibPose = function () {
+    if (screenPose === 'bend') { setStatus('calibNoBend', true); return; }
+    if (!lastVals) { setStatus('calibNoAI', true); return; }
+    calib[screenPose] = lastVals.map(numIn);
+    localStorage.setItem('jp_calib', JSON.stringify(calib));
+    setStatus('calibOk', false, t(POSES[screenPose].nameKey));
+};
+
+window.pickPose = function (p) {
+    screenPose = p;
+    ['back', 'side', 'bend'].forEach(k => $('ps-' + k).classList.toggle('on', k === p));
+    curGrade = null; pendingGrade = null; pendingCount = 0;
+    ['1', '2', '3'].forEach(id => { $('r-v' + id).innerText = '--'; $('m-v' + id).innerText = '--'; });
+    applyPoseTexts();
+};
+
+/* ---------- 启动 ---------- */
+window.startEngine = async function () {
+    startBtn.disabled = true;
+    setStatus('starting', false);
+    try {
+        await acquireCamera();
+    } catch (e) {
+        enterSim('camFail');
+        return;
+    }
+    setStatus('downloading', false);
+    try {
+        const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14');
+        const fileset = await vision.FilesetResolver.forVisionTasks(WASM_BASE);
+        landmarker = await vision.PoseLandmarker.createFromOptions(fileset, {
+            baseOptions: { modelAssetPath: localStorage.getItem('jp_model_url') || MODEL_DEFAULT, delegate: 'GPU' },
+            runningMode: 'VIDEO', numPoses: 1,
+            minPoseDetectionConfidence: 0.5, minPosePresenceConfidence: 0.5
+        });
+        setStatus('ready', false);
+        running = true;
+        requestAnimationFrame(loop);
+    } catch (e) {
+        enterSim('modelFail');
+    }
+};
+
+function enterSim(statusKey) {
+    usingSim = true;
+    video.style.display = 'none';
+    $('sim').style.display = 'flex';
+    setStatus(statusKey, true);
+}
+
+/* 获取摄像头：后置用 exact 精确约束，失败时降级为宽松约束 */
+async function acquireCamera() {
+    if (video.srcObject) video.srcObject.getTracks().forEach(tr => tr.stop());
+    const tryGet = c => navigator.mediaDevices.getUserMedia({ video: c, audio: false });
+    let stream;
+    try {
+        stream = await tryGet(camFacing === 'environment'
+            ? { facingMode: { exact: 'environment' }, width: { ideal: 720 }, height: { ideal: 960 } }
+            : { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 960 } });
+    } catch (e) {
+        stream = await tryGet({ facingMode: camFacing, width: { ideal: 720 }, height: { ideal: 960 } });
+    }
+    video.srcObject = stream;
+    await video.play();
+    smooth = null; curGrade = null; pendingGrade = null; pendingCount = 0;  // 新摄像头重置平滑与分级
+    video.style.display = '';
+    usingSim = false;
+    $('sim').style.display = 'none';
+    video.classList.toggle('mirror', camFacing === 'user');   // 仅前置镜像
+    overlay.classList.toggle('mirror', camFacing === 'user'); // 骨骼画布与视频同向，保证人点对齐
+}
+
+window.saveModelUrl = function () {
+    const v = $('model-url').value.trim();
+    v ? localStorage.setItem('jp_model_url', v) : localStorage.removeItem('jp_model_url');
+    location.reload();
+};
+
+/* 切换前后摄像头：不刷新页面，直接重取流（模型无需重新加载） */
+window.switchCam = async function () {
+    camFacing = camFacing === 'user' ? 'environment' : 'user';
+    localStorage.setItem('jp_facing', camFacing);
+    if (usingSim || !landmarker) { location.reload(); return; }
+    setStatus('switching', false);
+    try {
+        await acquireCamera();
+        setStatus(camFacing === 'environment' ? 'switchedPost' : 'switchedPre', false);
+    } catch (e) {
+        // 目标摄像头不存在（如台式机无后置），回退原摄像头
+        camFacing = camFacing === 'user' ? 'environment' : 'user';
+        localStorage.setItem('jp_facing', camFacing);
+        try { await acquireCamera(); } catch (e2) { enterSim('switchFail'); return; }
+        setStatus(camFacing === 'environment' ? 'noRear' : 'noFront', true);
+    }
+};
+
+/* ---------- Tab / 模式 ---------- */
+window.switchTab = function (i) {
+    document.querySelectorAll('.tab').forEach((el, k) => el.classList.toggle('on', k === i));
+    $('view-screen').classList.toggle('on', i === 0);
+    $('view-train').classList.toggle('on', i === 1);
+    $('view-about').classList.toggle('on', i === 2);
+    mode = i === 1 ? 'train' : 'screen';
+    $('rep').style.display = (mode === 'train' && exMode !== 2 && !usingSim) ? 'block' : 'none';
+    $('hint').style.bottom = (mode === 'train' && exMode !== 2 && !usingSim) ? '84px' : '46px';  // 避开计次角标
+};
+window.pickEx = function (n) {
+    exMode = n;
+    for (let k = 1; k <= 5; k++) $('ex' + k).classList.toggle('on', k === n);
+    $('rep').style.display = (n !== 2 && !usingSim) ? 'block' : 'none';
+    $('rep-label').innerText = n === 2 ? '' : t('rep' + n);
+    reps = 0; $('rep-num').innerText = 0;
+};
+
+/* ---------- 拍照记录 ---------- */
+window.snapshot = function () {
+    const s = document.createElement('canvas');
+    s.width = 172; s.height = 216;
+    s.getContext('2d').drawImage(video, 0, 0, s.width, s.height);
+    const item = document.createElement('div');
+    item.className = 'snap';
+    const stamp = new Date().toLocaleTimeString(curLang === 'zh' ? 'zh-CN' : 'en-US', { hour: '2-digit', minute: '2-digit' });
+    item.innerHTML = `<img src="${s.toDataURL('image/jpeg', .8)}"><span>${POSES[screenPose].live[curLang][0]} ${$('m-v1').innerText} · ${stamp}</span>`;
+    const list = $('snaps');
+    list.prepend(item);
+    while (list.children.length > 6) list.lastChild.remove();
+};
+
+/* ---------- 主循环 ---------- */
+function loop() {
+    if (!running) return;
+    if (video.readyState >= 2 && video.videoWidth) {
+        const now = performance.now();
+        if (video.currentTime !== lastVideoTime) {
+            lastVideoTime = video.currentTime;
+            const res = landmarker.detectForVideo(video, now);
+            draw(res);
+        }
+    }
+    requestAnimationFrame(loop);
+}
+
+function draw(res) {
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+    const lm0 = res.landmarks && res.landmarks[0];
+    if (!lm0) { smooth = null; return; }
+
+    /* ---- 指数平滑（EMA）：alpha 越小越稳，越大越跟手 ---- */
+    const A = 0.35;
+    if (!smooth || smooth.length !== lm0.length) {
+        smooth = lm0.map(p => ({ x: p.x, y: p.y, z: p.z, visibility: p.visibility }));
+    } else {
+        for (let i = 0; i < lm0.length; i++) {
+            smooth[i].x += A * (lm0[i].x - smooth[i].x);
+            smooth[i].y += A * (lm0[i].y - smooth[i].y);
+            smooth[i].z += A * (lm0[i].z - smooth[i].z);
+            smooth[i].visibility = lm0[i].visibility;
+        }
+    }
+    const lm = smooth;
+    const W = overlay.width, H = overlay.height;
+
+    /* 骨架 */
+    ctx.lineWidth = Math.max(3, W / 180);
+    ctx.strokeStyle = 'rgba(126,224,194,.9)';
+    CONN.forEach(([a, b]) => {
+        ctx.beginPath();
+        ctx.moveTo(lm[a].x * W, lm[a].y * H);
+        ctx.lineTo(lm[b].x * W, lm[b].y * H);
+        ctx.stroke();
+    });
+    ctx.fillStyle = '#ffe08a';
+    [0, 11, 12, 15, 16, 23, 24].forEach(i => {
+        ctx.beginPath();
+        ctx.arc(lm[i].x * W, lm[i].y * H, Math.max(5, W / 110), 0, 7);
+        ctx.fill();
+    });
+
+    /* ---- 公共骨骼点派生量 ---- */
+    const ls = lm[11], rs = lm[12], lh = lm[23], rh = lm[24], nose = lm[0];
+    const shW = Math.hypot(rs.x - ls.x, rs.y - ls.y) || 1e-6;
+    const shM = { x: (ls.x + rs.x) / 2, y: (ls.y + rs.y) / 2, z: (ls.z + rs.z) / 2 };
+    const hpM = { x: (lh.x + rh.x) / 2, y: (lh.y + rh.y) / 2, z: (lh.z + rh.z) / 2 };
+    const earM = { x: (lm[7].x + lm[8].x) / 2, y: (lm[7].y + lm[8].y) / 2 };
+    const torsoLen = Math.hypot(shM.x - hpM.x, shM.y - hpM.y) || 1e-6;
+    const shTilt = Math.atan2(Math.abs(ls.y - rs.y), Math.abs(rs.x - ls.x)) * 180 / Math.PI;
+    const hipTilt = Math.atan2(Math.abs(lh.y - rh.y), Math.abs(rh.x - lh.x)) * 180 / Math.PI;
+    const maxTilt = Math.max(shTilt, hipTilt);
+    const v = { lm, ls, rs, lh, rh, nose, shW, shM, hpM, earM, torsoLen, maxTilt, deg: r => (r * 180 / Math.PI).toFixed(1) + '°' };
+
+    /* ---- 按当前体位更新指标 UI（数值实时刷新，分级需连续 4 帧确认防闪烁） ---- */
+    {
+        const out = POSES[screenPose].calc(v);
+        lastVals = out.vals.slice();
+
+        /* 零位校准：显示值 = 原始值 - 基线；分级按校准后数值重算 */
+        const cb = calib[screenPose];
+        let disp = out.vals, g = out.g;
+        if (cb) {
+            disp = out.vals.map((s, i) => {
+                if (cb[i] == null) return s;
+                const n = numIn(s); if (n == null) return s;
+                const unit = String(s).replace(/[-+]?\d+\.?\d*/, '');
+                let d = n - cb[i];
+                if (Math.abs(d) < 0.05) d = 0;
+                return d.toFixed(1) + unit;
+            });
+            if (screenPose === 'back') {
+                const mt = Math.max(Math.abs(numIn(disp[0])), Math.abs(numIn(disp[1])));
+                g = mt >= 6 ? 'r' : mt >= 2.5 ? 'y' : 'g';
+            } else if (screenPose === 'side') {
+                const h = Math.abs(numIn(disp[0])), tr = Math.abs(numIn(disp[1]));
+                g = (h >= 20 || tr >= 15) ? 'r' : (h >= 12 || tr >= 10) ? 'y' : 'g';
+            }
+        }
+
+        disp.forEach((val, k) => {
+            $('r-v' + (k + 1)).innerText = val;
+            $('m-v' + (k + 1)).innerText = val;
+        });
+        if (g === curGrade) { pendingGrade = null; pendingCount = 0; }
+        else {
+            pendingCount = (pendingGrade === g) ? pendingCount + 1 : 1;
+            pendingGrade = g;
+            if (pendingCount >= 4) { curGrade = g; pendingGrade = null; pendingCount = 0; }
+        }
+        const gc = curGrade || g;
+        $('grade').innerText = gradeWord(gc);
+        $('grade').style.background = gc === 'g' ? '#22c55e' : gc === 'y' ? '#f39c12' : '#e74c3c';
+        ['g', 'y', 'r'].forEach(k => $('lv-' + k).classList.toggle('on', k === gc));
+    }
+
+    /* ---- 跟练逻辑（五个动作） ---- */
+    if (mode === 'train') {
+        const now = Date.now();
+        const earL = lm[7], earR = lm[8];
+        const wL = lm[15], wR = lm[16];
+        const shrug = Math.min((earL.y - ls.y), (earR.y - rs.y)) / shW;
+        const award = () => {
+            reps++; $('rep-num').innerText = reps;
+            qi += 5; localStorage.setItem('jp_qi', qi); $('qi').innerText = qi;
+        };
+        if (exMode === 1) {                       // 双手托天：手腕过鼻尖
+            const raised = wL.y < nose.y && wR.y < nose.y;
+            if (wasRaised && !raised) award();    // 完成一次「起-落」
+            wasRaised = raised;
+            if (raised && shrug < 0.16) showWarn('warnShrug', null, now);
+        }
+        if (exMode === 2) {                       // 沉肩静站：耸肩检测
+            if (shrug < 0.14) showWarn('warnShrug2', null, now);
+        }
+        if (exMode === 3) {                       // 小燕飞：俯卧（侧对镜头），躯干抬起角度
+            const a = Math.atan2(Math.abs(shM.y - hpM.y), Math.abs(shM.x - hpM.x)) * 180 / Math.PI;
+            const lifted = a >= 20;
+            if (wasLifted && !lifted && a < 10) award();
+            wasLifted = lifted;
+            if (a > 45) showWarn('warnLift', null, now);
+        }
+        if (exMode === 4) {                       // 猫式伸展：跪姿，低头→抬头一个来回
+            const e = (earM.y - shM.y) / torsoLen; // 正=耳接近肩线(低头), 负=耳远高于肩(抬头)
+            if (e > -0.06) catPhase = 'down';
+            else if (e < -0.22 && catPhase === 'down') { award(); catPhase = 'none'; }
+        }
+        if (exMode === 5) {                       // 靠墙天使：手臂上滑过头回落 + 离墙检测
+            const zDev = Math.abs((wL.z + wR.z) / 2 - shM.z);
+            if (zDev > 0.16) {
+                showWarn('warnWall', null, now);
+                wasRaised = false;
+            } else {
+                const up = wL.y < nose.y && wR.y < nose.y;
+                if (wasRaised && !up && wL.y > ls.y && wR.y > rs.y) award();
+                wasRaised = up;
+            }
+        }
+        if (maxTilt >= 6 && now > warnUntil) showWarn('warnTilt', maxTilt.toFixed(1), now);
+    }
+}
+
+function showWarn(key, arg, now) {
+    if (Date.now() < warnUntil) return;
+    warnUntil = now + 3000;
+    const w = $('warn');
+    w.innerText = arg ? tf(key, arg) : t(key);
+    w.style.display = 'block';
+    setTimeout(() => { w.style.display = 'none'; }, 3000);
+}
+
+/* ---------- 初始化 ---------- */
+$('qi').innerText = qi;
+applyLang();
+</script>
+</body>
+</html>
