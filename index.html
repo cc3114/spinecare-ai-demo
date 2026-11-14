@@ -995,14 +995,19 @@ function buildShot() {
     });
     /* 等级角标 */
     const gc = curGrade || 'g';
-    g.fillStyle = gc === 'g' ? '#22c55e' : gc === 'y' ? '#f39c12' : '#e74c3c';
     const tag = gradeWord(gc);
     g.font = `700 ${fs}px sans-serif`;
     const tw = g.measureText(tag).width + fs * 1.4;
-    if (g.roundRect) { g.beginPath(); g.roundRect(cw - tw - 12, 12, tw, fs * 1.9, 999); g.fill(); }
-    else g.fillRect(cw - tw - 12, 12, tw, fs * 1.9);
+    const tagH = fs * 1.9;
+    g.fillStyle = gc === 'g' ? '#22c55e' : gc === 'y' ? '#f39c12' : '#e74c3c';
+    if (g.roundRect) { g.beginPath(); g.roundRect(cw - tw - 12, 12, tw, tagH, 999); g.fill(); }
+    else g.fillRect(cw - tw - 12, 12, tw, tagH);
     g.fillStyle = '#fff';
-    g.fillText(tag, cw - tw / 2 - 12, 12 + fs * 1.35);
+    g.textAlign = 'center';            /* 水平：以胶囊中心为锚点 */
+    g.textBaseline = 'middle';         /* 垂直：对齐胶囊中线 */
+    g.fillText(tag, cw - tw / 2 - 12, 12 + tagH / 2);
+    g.textAlign = 'left';
+    g.textBaseline = 'alphabetic';
     /* 时间戳 + 免责声明 */
     g.font = `${Math.round(fs * .7)}px sans-serif`;
     g.fillStyle = 'rgba(255,255,255,.85)';
