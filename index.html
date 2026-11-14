@@ -66,7 +66,8 @@
        两者结果一致，纯 CSS 由布局宽度推导，不依赖 JS 时序 */
     .stage { position: relative; flex: 1; min-width: 0; aspect-ratio: 9 / 16; background: #0c1513; overflow: hidden; }
     .stage::before { content: ""; display: block; padding-top: 177.78%; }
-    .stage video, .stage canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+    /* contain：保证摄像头采集到的整幅画面（含头顶到脚底）完整可见，不再被裁切 */
+    .stage video, .stage canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }
     .stage video.mirror, .stage canvas.mirror { transform: scaleX(-1); }
     .stage .sim-overlay {
         position: absolute; inset: 0; display: none;
@@ -150,6 +151,7 @@
     }
     .btn.primary { background: #2c5e55; }
     .btn.danger { background: #e74c3c; }
+    .btn.toggled { background: #2c5e55; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.5); }
     .btn:disabled { opacity: .5; }
     .snap-list { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0; }
     .snap-list:empty::after { content: '暂无拍照记录，点击上方「拍照」采集'; font-size: 12px; color: #9db4ae; }
@@ -184,12 +186,135 @@
     .tab.on { color: #2c5e55; font-weight: 700; }
     .view { display: none; }
     .view.on { display: block; }
+
+    /* ===== 顶栏返回 ===== */
+    .tb-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .tb-back {
+        width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%;
+        background: rgba(255,255,255,.16); color: #fff; font-size: 18px; line-height: 26px;
+        text-align: center; cursor: pointer; padding-bottom: 2px;
+    }
+    .tb-back:active { background: rgba(255,255,255,.3); }
+
+    /* ===== 首页（三个入口） ===== */
+    #home {
+        width: 100%; max-width: 480px; min-height: 100%; padding: 26px 18px 30px;
+        display: flex; flex-direction: column; gap: 14px;
+        background: linear-gradient(180deg, #2c5e55 0%, #2c5e55 190px, #f5faf8 190px, #f5faf8 100%);
+    }
+    #home.hide { display: none; }
+    .app.off { display: none; }
+    .home-brand { color: #fff; font-size: 26px; font-weight: 800; letter-spacing: 2px; }
+    .home-brand small { display: block; font-size: 10.5px; font-weight: 400; opacity: .8; letter-spacing: 2.5px; margin-top: 4px; }
+    .home-sub { color: rgba(255,255,255,.85); font-size: 12.5px; margin-top: 10px; margin-bottom: 16px; }
+    .home-card {
+        position: relative; width: 100%; text-align: left; border: none; cursor: pointer;
+        background: #fff; border-radius: 18px; padding: 18px 18px 16px 66px;
+        box-shadow: 0 6px 20px rgba(20,60,52,.10); border: 1px solid #e3efeb;
+        display: block; font-family: inherit;
+    }
+    .home-card:active { transform: scale(.985); }
+    .home-card .hc-ic {
+        position: absolute; left: 16px; top: 17px; width: 38px; height: 38px; border-radius: 12px;
+        display: flex; align-items: center; justify-content: center; font-size: 20px;
+    }
+    .home-card.c1 .hc-ic { background: #e8f3f0; }
+    .home-card.c2 .hc-ic { background: #fdf1e3; }
+    .home-card.c3 .hc-ic { background: #eef0fb; }
+    .home-card .hc-t { display: block; font-size: 17px; font-weight: 700; color: #23423c; }
+    .home-card .hc-d { display: block; font-size: 11.5px; color: #7c938d; line-height: 1.55; margin-top: 5px; }
+    .home-card .hc-go { position: absolute; right: 16px; top: 20px; font-size: 13px; color: #9db4ae; }
+    .home-foot { margin-top: auto; padding-top: 18px; font-size: 11px; color: #9db4ae; text-align: center; line-height: 1.7; }
+
+    /* ===== 取景辅助：倒计时 / 全身入镜提示 ===== */
+    .cd {
+        position: absolute; inset: 0; z-index: 8; display: none;
+        align-items: center; justify-content: center; pointer-events: none;
+    }
+    .cd b {
+        font-size: 96px; font-weight: 800; color: #fff; line-height: 1;
+        text-shadow: 0 4px 24px rgba(0,0,0,.55); font-variant-numeric: tabular-nums;
+    }
+    .fit-hint {
+        position: absolute; left: 8px; right: 8px; top: 8px; z-index: 7;
+        background: rgba(231,76,60,.92); color: #fff; border-radius: 10px;
+        padding: 7px 10px; font-size: 11.5px; line-height: 1.45; text-align: center; display: none;
+    }
+    .fit-hint.ok { background: rgba(34,197,94,.9); }
+    .stage .fit-hint.show { display: block; }
+    .live-metrics .lm b { font-size: 14.5px; }
+
+    /* ===== 拍照结果：全屏覆盖层（报告页也能打开） ===== */
+    .shot-wrap {
+        position: fixed; top: 0; bottom: 0; left: 0; right: 0; margin: 0 auto;
+        max-width: 480px; z-index: 99; display: none; background: #0c1513;
+        flex-direction: column;
+    }
+    .shot-wrap.on { display: flex; }
+    .shot-wrap img { width: 100%; flex: 1; min-height: 0; object-fit: contain; }
+    .shot-bar { display: flex; gap: 6px; padding: 6px; background: rgba(12,21,19,.96); }
+    .shot-bar button {
+        flex: 1; border: none; border-radius: 9px; padding: 8px 4px; font-size: 12px;
+        font-weight: 600; cursor: pointer; color: #fff; background: #2c5e55; font-family: inherit;
+    }
+    .shot-bar button.ghost { background: rgba(255,255,255,.16); }
+
+    /* ===== 报告列表 ===== */
+    .rp-item { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid #eef4f2; cursor: pointer; }
+    .rp-item:last-child { border-bottom: none; }
+    .rp-item img { width: 58px; height: 76px; object-fit: cover; border-radius: 8px; background: #eef4f2; flex-shrink: 0; }
+    .rp-main { flex: 1; min-width: 0; }
+    .rp-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+    .rp-pose { font-size: 13px; font-weight: 700; color: #23423c; }
+    .rp-tag { font-size: 10.5px; color: #fff; padding: 2px 8px; border-radius: 999px; flex-shrink: 0; }
+    .rp-time { font-size: 10.5px; color: #9db4ae; margin: 2px 0 4px; }
+    .rp-vals { font-size: 11px; color: #5c736d; line-height: 1.55; }
+    .rp-empty { font-size: 12px; color: #9db4ae; text-align: center; padding: 18px 0; line-height: 1.8; }
+    .rp-stat { display: flex; gap: 12px; margin-bottom: 4px; }
+    .rp-stat div { flex: 1; background: #f6faf9; border-radius: 10px; padding: 8px 10px; }
+    .rp-stat span { display: block; font-size: 10.5px; color: #9db4ae; }
+    .rp-stat b { font-size: 15px; color: #23423c; }
 </style>
 </head>
 <body>
-<div class="app">
+
+<!-- ================= 首页：三个入口 ================= -->
+<div id="home">
+    <div class="home-brand"><span data-i18n="brand">脊正 · 真机版</span>
+        <small data-i18n="homeBrandSub">SPINECARE AI · 家庭脊柱侧弯初筛</small>
+    </div>
+    <div class="home-sub" data-i18n="homeSub">请选择要进行的环节</div>
+
+    <button class="home-card c1" onclick="enterSection('screen')">
+        <span class="hc-ic">🩻</span>
+        <span class="hc-t" data-i18n="homeC1t">侧弯度测量</span>
+        <span class="hc-d" data-i18n="homeC1d">背面 / 侧面 / 前屈三个体位，实时计算高低肩、骨盆倾斜、躯干前倾与弯腰对称度，可拍照存档对比。</span>
+        <span class="hc-go">›</span>
+    </button>
+
+    <button class="home-card c2" onclick="enterSection('train')">
+        <span class="hc-ic">🧘</span>
+        <span class="hc-t" data-i18n="homeC2t">日常练习</span>
+        <span class="hc-d" data-i18n="homeC2d">五个居家矫正动作，AI 实时计数与纠错：托天、沉肩、小燕飞、猫式、靠墙天使。</span>
+        <span class="hc-go">›</span>
+    </button>
+
+    <button class="home-card c3" onclick="enterSection('report')">
+        <span class="hc-ic">📊</span>
+        <span class="hc-t" data-i18n="homeC3t">我的报告</span>
+        <span class="hc-d" data-i18n="homeC3d">查看历次测量记录与照片，跟踪体态变化趋势。</span>
+        <span class="hc-go">›</span>
+    </button>
+
+    <div class="home-foot" data-i18n="homeFoot">仅作家庭初筛参考，不构成医学诊断 · 确诊请就医拍 X 光</div>
+</div>
+
+<div class="app off" id="app">
     <div class="topbar">
-        <div class="brand"><span id="brand-name">脊正 · 真机版</span><small>SPINECARE AI · V9</small></div>
+        <div class="tb-left">
+            <span class="tb-back" onclick="showHome()">‹</span>
+            <div class="brand"><span id="brand-name">脊正 · 真机版</span><small>SPINECARE AI · V10</small></div>
+        </div>
         <div class="top-right">
             <div class="qi"><span data-i18n="qiLabel">正气值</span> <b id="qi">0</b></div>
             <div class="lang" id="lang-btn" onclick="toggleLang()">EN</div>
@@ -232,6 +357,8 @@
         </div>
         <div class="grade-chip" id="grade">--</div>
         <div class="ai-warn" id="warn"></div>
+        <div class="fit-hint" id="fit"></div>
+        <div class="cd" id="cd"><b>3</b></div>
         <div class="rep-badge" id="rep"><b id="rep-num">0</b><span id="rep-label">双手托天 · 次</span></div>
         <svg class="guide" viewBox="0 0 120 230" fill="none">
             <circle cx="60" cy="24" r="15" stroke="rgba(126,224,194,.75)" stroke-width="2" stroke-dasharray="6 5" fill="rgba(126,224,194,.06)"/>
@@ -245,11 +372,16 @@
     <div class="body">
         <!-- 筛查视图 -->
         <div id="view-screen" class="view on">
-            <div class="row" style="margin-bottom:12px;">
+            <div class="row" style="margin-bottom:8px;">
                 <button class="btn primary" onclick="snapshot()" data-i18n="snapBtn">📸 拍照</button>
+                <button class="btn" onclick="countdownShot()" data-i18n="snapCdBtn">⏱ 倒计时拍照</button>
+                <button class="btn" id="gesture-btn" onclick="toggleGesture()" data-i18n="snapGesBtn">✋ 手势拍照</button>
+            </div>
+            <div class="row" style="margin-bottom:12px;">
                 <button class="btn" onclick="switchCam()" data-i18n="switchCamBtn">🔄 切换摄像头</button>
                 <button class="btn" onclick="calibPose()" data-i18n="calibBtn">⚖️ 零位校准</button>
             </div>
+            <p class="note" style="margin:-6px 0 12px;" data-i18n="shotTip">站远一点让头顶到脚底都入镜：点「倒计时拍照」后有 3 秒摆姿势；或开启「手势拍照」，把手举过头顶即可自动拍摄。</p>
             <p class="note" style="margin:-6px 0 12px;" data-i18n="calibTip"></p>
             <div class="card">
                 <h4 data-i18n="snapCard">拍照记录（复筛对比用）</h4>
@@ -273,6 +405,25 @@
             <p class="note" data-i18n="trainNote"></p>
         </div>
 
+        <!-- 报告视图 -->
+        <div id="view-report" class="view">
+            <div class="card">
+                <h4 data-i18n="rpStatTitle">体态概览</h4>
+                <div class="rp-stat">
+                    <div><span data-i18n="rpStatN">记录总数</span><b id="rp-n">0</b></div>
+                    <div><span data-i18n="rpStatLast">最近一次</span><b id="rp-last">--</b></div>
+                    <div><span data-i18n="rpStatWorst">最差等级</span><b id="rp-worst">--</b></div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="row" style="margin-bottom:4px;">
+                    <h4 style="flex:1;margin-bottom:0;" data-i18n="rpListTitle">测量记录</h4>
+                    <button class="btn danger" style="max-width:96px;flex:none;padding:8px;" onclick="clearReport()" data-i18n="rpClear">清空</button>
+                </div>
+                <div id="report-list"></div>
+            </div>
+        </div>
+
         <!-- 关于视图 -->
         <div id="view-about" class="view">
             <div class="card">
@@ -287,10 +438,20 @@
         </div>
     </div>
 
+    <!-- 拍照结果全屏覆盖层（测量页拍照后直接显示，报告页查看大图也复用它） -->
+    <div class="shot-wrap" id="shot-wrap">
+        <img id="shot-img" alt="capture">
+        <div class="shot-bar">
+            <button onclick="saveShot()" data-i18n="shotSave">保存图片</button>
+            <button class="ghost" onclick="closeShot()" data-i18n="shotClose">返回实时画面</button>
+        </div>
+    </div>
+
     <div class="tabbar">
-        <div class="tab on" onclick="switchTab(0)"><span class="ic">📸</span><span data-i18n="tabScreen">筛查</span></div>
+        <div class="tab on" onclick="switchTab(0)"><span class="ic">🩻</span><span data-i18n="tabScreen">测量</span></div>
         <div class="tab" onclick="switchTab(1)"><span class="ic">🧘</span><span data-i18n="tabTrain">跟练</span></div>
-        <div class="tab" onclick="switchTab(2)"><span class="ic">ℹ️</span><span data-i18n="tabAbout">说明</span></div>
+        <div class="tab" onclick="switchTab(2)"><span class="ic">📊</span><span data-i18n="tabReport">报告</span></div>
+        <div class="tab" onclick="switchTab(3)"><span class="ic">ℹ️</span><span data-i18n="tabAbout">说明</span></div>
     </div>
 </div>
 
@@ -312,6 +473,10 @@ let warnUntil = 0;
 let smooth = null;                   // 骨骼点指数平滑缓存（抑制逐帧抖动）
 let curGrade = null, pendingGrade = null, pendingCount = 0;  // 分级防抖
 let curLang = localStorage.getItem('jp_lang') === 'en' ? 'en' : 'zh';
+let gestureOn = false, gestureHold = 0, gestureCooldown = 0, cdRunning = false;  // 手势拍照 / 倒计时
+let fitShown = '';                   // 全身入镜提示状态
+let reports = [];                    // 测量报告（含照片，存 localStorage）
+try { reports = JSON.parse(localStorage.getItem('jp_reports') || '[]'); } catch (e) { reports = []; }
 
 const MODEL_DEFAULT = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
 const WASM_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm';
@@ -365,7 +530,28 @@ const I18N = {
         modelTitle: '模型源（国内网络不通时可替换镜像地址）',
         modelPh: '粘贴 pose_landmarker_lite.task 镜像 URL',
         saveRestart: '保存并重启 AI',
-        tabScreen: '筛查', tabTrain: '跟练', tabAbout: '说明',
+        tabScreen: '测量', tabTrain: '跟练', tabAbout: '说明', tabReport: '报告',
+        homeBrandSub: 'SPINECARE AI · 家庭脊柱侧弯初筛',
+        homeSub: '请选择要进行的环节',
+        homeC1t: '侧弯度测量',
+        homeC1d: '背面 / 侧面 / 前屈三个体位，实时计算高低肩、骨盆倾斜、躯干前倾与弯腰对称度，可拍照存档对比。',
+        homeC2t: '日常练习',
+        homeC2d: '五个居家矫正动作，AI 实时计数与纠错：托天、沉肩、小燕飞、猫式、靠墙天使。',
+        homeC3t: '我的报告',
+        homeC3d: '查看历次测量记录与照片，跟踪体态变化趋势。',
+        homeFoot: '仅作家庭初筛参考，不构成医学诊断 · 确诊请就医拍 X 光',
+        snapCdBtn: '⏱ 倒计时拍照', snapGesBtn: '✋ 手势拍照', snapGesOn: '✋ 手势拍照 · 开',
+        shotTip: '站远一点让头顶到脚底都入镜：「倒计时拍照」有 3 秒摆姿势时间；「手势拍照」开启后把手举过头顶即可自动拍摄。',
+        shotSave: '保存图片', shotClose: '返回实时画面',
+        fitHead: '⚠️ 头顶超出画面：请后退一步或把手机放低',
+        fitFeet: '⚠️ 脚踝未入镜：请后退一步，直到全身可见',
+        fitOk: '✓ 全身已入镜，可以开始测量',
+        snapFail: '摄像头未就绪，请先启动摄像头与 AI',
+        rpStatTitle: '体态概览', rpStatN: '记录总数', rpStatLast: '最近一次', rpStatWorst: '最差等级',
+        rpListTitle: '测量记录', rpClear: '清空',
+        rpEmpty: '暂无测量记录 · 去「侧弯度测量」拍一张吧',
+        rpClearOk: '已清空全部测量记录',
+        rpFull: '本机存储已满，仅保留了数值记录（照片未能保存）',
         warnShrug: '⚠️ 检测到耸肩！请沉肩坠肘，放松斜方肌',
         warnShrug2: '⚠️ 检测到耸肩！请沉肩坠肘，配合深呼吸',
         warnTilt: '⚠️ 身体歪斜 {v}°，请回正再继续',
@@ -418,7 +604,28 @@ const I18N = {
         modelTitle: 'Model source (set a mirror URL if blocked)',
         modelPh: 'Paste a mirror URL for pose_landmarker_lite.task',
         saveRestart: 'Save & restart AI',
-        tabScreen: 'Screen', tabTrain: 'Train', tabAbout: 'Info',
+        tabScreen: 'Screen', tabTrain: 'Train', tabAbout: 'Info', tabReport: 'Report',
+        homeBrandSub: 'SPINECARE AI · at-home scoliosis screening',
+        homeSub: 'Choose what you want to do',
+        homeC1t: 'Posture screening',
+        homeC1d: 'Back / side / forward-bend: live shoulder tilt, pelvic tilt, trunk lean and bend symmetry, with photos for comparison.',
+        homeC2t: 'Daily exercises',
+        homeC2d: 'Five home exercises with AI rep counting and real-time correction: arm raise, shoulder release, back extension, cat-cow, wall angel.',
+        homeC3t: 'My report',
+        homeC3d: 'Review past measurements and photos, and track posture changes over time.',
+        homeFoot: 'For family screening only, not a medical diagnosis · See a doctor for an X-ray',
+        snapCdBtn: '⏱ Countdown', snapGesBtn: '✋ Gesture', snapGesOn: '✋ Gesture · ON',
+        shotTip: 'Step back until the whole body from head to feet is in frame. "Countdown" gives you 3s to pose; with "Gesture" on, raising a hand above your head takes the shot automatically.',
+        shotSave: 'Save photo', shotClose: 'Back to live',
+        fitHead: '⚠️ Head is out of frame: step back or lower the phone',
+        fitFeet: '⚠️ Ankles out of frame: step back until the full body is visible',
+        fitOk: '✓ Full body in frame — you can start measuring',
+        snapFail: 'Camera not ready — start camera & AI first',
+        rpStatTitle: 'Overview', rpStatN: 'Records', rpStatLast: 'Latest', rpStatWorst: 'Worst grade',
+        rpListTitle: 'Measurements', rpClear: 'Clear',
+        rpEmpty: 'No measurements yet · take one in "Posture screening"',
+        rpClearOk: 'All measurements cleared',
+        rpFull: 'Local storage is full — only the numeric readings were saved (photos skipped)',
         warnShrug: '⚠️ Shoulders raised! Relax and let them drop',
         warnShrug2: '⚠️ Shoulders raised! Drop them and breathe slowly',
         warnTilt: '⚠️ Body tilted {v}° — straighten up',
@@ -462,9 +669,13 @@ const POSES = {
             en: 'Thresholds: forward head ≥12° amber, ≥20° red; trunk lean ≥10° amber. Screening only, not a diagnosis.'
         },
         calc(v) {
-            const headA = Math.atan2(Math.abs(v.earM.x - v.shM.x), Math.max(1e-6, v.shM.y - v.earM.y)) * 180 / Math.PI;
-            const trunkA = Math.atan2(Math.abs(v.shM.x - v.hpM.x), Math.max(1e-6, v.shM.y - v.hpM.y)) * 180 / Math.PI;
-            const ankM = { x: (v.lm[27].x + v.lm[28].x) / 2 };
+            /* 向量夹角法（弧度制，由 v.deg 统一转角度，杜绝二次换算）：
+               angleUp = 髋→肩 / 肩→耳 向量与竖直向上方向的夹角
+               0° = 完全竖直（站直），90° = 水平，数学上被 acos 限制在 0~180°，不可能越界 */
+            const headA = v.angleUp(v.shM, v.earM);   // 头前伸：耳中点偏离肩正上方的角度
+            const trunkA = v.angleUp(v.hpM, v.shM);   // 躯干前倾：肩中点偏离髋正上方的角度
+            const ank = v.lm[27], ankr = v.lm[28];
+            const ankM = { x: (ank.x + ankr.x) / 2 };
             const plumb = Math.abs(v.earM.x - ankM.x) / v.torsoLen * 100;
             let g = 'g';
             if (headA >= 20 || trunkA >= 15) g = 'r';
@@ -482,14 +693,17 @@ const POSES = {
             en: 'Thresholds: back asymmetry ≥5% amber, ≥10% red (rib-hump hint). No depth sensor — screening only; see a doctor for an X-ray.'
         },
         calc(v) {
-            const dy = Math.max(1e-6, v.hpM.y - v.shM.y);
-            const dz = Math.abs(v.shM.z - v.hpM.z);
-            const bendA = Math.atan2(dz, dy) * 180 / Math.PI;   // 0° 直立 → 约 90° 水平
+            /* 弯腰角度：髋→肩 三维向量（含深度 z）与竖直方向的夹角。
+               直立 ≈ 0°，前屈 90° ≈ 90°（水平）；acos 保证结果恒在 0~180° 内。
+               旧实现把已转成角度的值又传给 v.deg 二次换算，导致显示 200°~500°，已修复。 */
+            const bendA = v.angleUp3(v.hpM, v.shM);
             const asymY = Math.abs(v.ls.y - v.rs.y) / v.shW * 100;
             const asymZ = Math.abs(v.ls.z - v.rs.z) / v.shW * 100;
             const asym = Math.max(asymY, asymZ);
+            const bendDeg = v.deg(bendA);
+            const bendNum = parseFloat(bendDeg);
             return {
-                vals: [v.deg(bendA), asym.toFixed(0) + '%', bendA >= 70 ? t('bendOk') : bendA >= 40 ? t('bendMore') : t('bendGo')],
+                vals: [bendDeg, asym.toFixed(0) + '%', bendNum >= 70 ? t('bendOk') : bendNum >= 40 ? t('bendMore') : t('bendGo')],
                 g: asym >= 10 ? 'r' : asym >= 5 ? 'y' : 'g'
             };
         }
@@ -528,6 +742,7 @@ function applyLang() {
     renderStatus();
     renderGrade();
     $('rep-label').innerText = exMode === 2 ? '' : t('rep' + exMode);
+    $('gesture-btn').innerText = gestureOn ? t('snapGesOn') : t('snapGesBtn');
 }
 window.toggleLang = function () {
     curLang = curLang === 'zh' ? 'en' : 'zh';
@@ -578,22 +793,38 @@ window.startEngine = async function () {
         enterSim('camFail');
         return;
     }
-    setStatus('downloading', false);
-    try {
-        const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14');
-        const fileset = await vision.FilesetResolver.forVisionTasks(WASM_BASE);
-        landmarker = await vision.PoseLandmarker.createFromOptions(fileset, {
-            baseOptions: { modelAssetPath: localStorage.getItem('jp_model_url') || MODEL_DEFAULT, delegate: 'GPU' },
-            runningMode: 'VIDEO', numPoses: 1,
-            minPoseDetectionConfidence: 0.5, minPosePresenceConfidence: 0.5
-        });
-        setStatus('ready', false);
-        running = true;
-        requestAnimationFrame(loop);
-    } catch (e) {
-        enterSim('modelFail');
+    /* 模型只加载一次：从首页返回 / 重进页面时直接复用已就绪的 landmarker */
+    if (!landmarker) {
+        setStatus('downloading', false);
+        try {
+            const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14');
+            const fileset = await vision.FilesetResolver.forVisionTasks(WASM_BASE);
+            landmarker = await vision.PoseLandmarker.createFromOptions(fileset, {
+                baseOptions: { modelAssetPath: localStorage.getItem('jp_model_url') || MODEL_DEFAULT, delegate: 'GPU' },
+                runningMode: 'VIDEO', numPoses: 1,
+                minPoseDetectionConfidence: 0.5, minPosePresenceConfidence: 0.5
+            });
+        } catch (e) {
+            enterSim('modelFail');
+            return;
+        }
     }
+    setStatus('ready', false);
+    running = true;
+    requestAnimationFrame(loop);
 };
+
+/* 回首页时释放摄像头（模型缓存保留，重进无需重新下载） */
+function stopCamera() {
+    running = false;
+    lastVideoTime = -1;
+    if (video.srcObject) { video.srcObject.getTracks().forEach(tr => tr.stop()); video.srcObject = null; }
+    video.style.display = 'none';
+    $('sim').style.display = 'none';
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+    startBtn.disabled = false;
+    if (statusState && !statusState.err) { statusState = { key: 'statusIdle', err: false, arg: '' }; renderStatus(); }
+}
 
 function enterSim(statusKey) {
     usingSim = true;
@@ -648,13 +879,37 @@ window.switchCam = async function () {
     }
 };
 
-/* ---------- Tab / 模式 ---------- */
+/* ---------- 首页 / Tab 路由 ---------- */
+window.showHome = function () {
+    $('home').classList.remove('hide');
+    $('app').classList.add('off');
+    closeShot();
+    stopCamera();               // 回首页释放摄像头，省电并释放权限占用
+};
+
+/* 从首页三大入口进入对应页面 */
+window.enterSection = function (sec) {
+    $('home').classList.add('hide');
+    $('app').classList.remove('off');
+    closeShot();
+    if (sec === 'screen') switchTab(0);
+    else if (sec === 'train') switchTab(1);
+    else if (sec === 'report') switchTab(2);
+    /* 测量 / 跟练需要摄像头：引擎未启动则自动启动（模型已加载时直接复用，不重新下载） */
+    if (sec !== 'report' && !running && !usingSim) startEngine();
+    window.scrollTo(0, 0);
+};
+
 window.switchTab = function (i) {
     document.querySelectorAll('.tab').forEach((el, k) => el.classList.toggle('on', k === i));
     $('view-screen').classList.toggle('on', i === 0);
     $('view-train').classList.toggle('on', i === 1);
-    $('view-about').classList.toggle('on', i === 2);
+    $('view-report').classList.toggle('on', i === 2);
+    $('view-about').classList.toggle('on', i === 3);
     mode = i === 1 ? 'train' : 'screen';
+    /* 报告 / 说明页不需要取景框，隐藏摄像头区域让内容占满屏幕 */
+    document.querySelector('.cam-row').style.display = (i <= 1) ? 'flex' : 'none';
+    if (i === 2) renderReport();
     $('rep').style.display = (mode === 'train' && exMode !== 2 && !usingSim) ? 'block' : 'none';
     $('hint').style.bottom = (mode === 'train' && exMode !== 2 && !usingSim) ? '84px' : '46px';  // 避开计次角标
 };
@@ -666,24 +921,213 @@ window.pickEx = function (n) {
     reps = 0; $('rep-num').innerText = 0;
 };
 
-/* ---------- 拍照记录 ---------- */
+/* ---------- 拍照：合成「画面 + 骨骼 + 实时数据」→ 取景框内展示 + 存入报告 ---------- */
 window.snapshot = function () {
-    const s = document.createElement('canvas');
-    s.width = 172; s.height = 216;
-    s.getContext('2d').drawImage(video, 0, 0, s.width, s.height);
-    const item = document.createElement('div');
-    item.className = 'snap';
-    const stamp = new Date().toLocaleTimeString(curLang === 'zh' ? 'zh-CN' : 'en-US', { hour: '2-digit', minute: '2-digit' });
-    item.innerHTML = `<img src="${s.toDataURL('image/jpeg', .8)}"><span>${POSES[screenPose].live[curLang][0]} ${$('m-v1').innerText} · ${stamp}</span>`;
-    const list = $('snaps');
-    list.prepend(item);
-    while (list.children.length > 6) list.lastChild.remove();
+    if (!video.videoWidth) { setStatus('snapFail', true); return; }
+    const shot = buildShot();
+    $('shot-img').src = shot.full;
+    $('shot-wrap').classList.add('on');
+    addRecord(shot.thumb, shot.vals, shot.labels, shot.grade);
+    renderSnaps();
 };
+
+/* 合成完整照片：视频帧（保持屏幕上的镜像方向）+ 骨骼线 + 数据面板 + 时间戳 */
+function buildShot() {
+    const vw = video.videoWidth, vh = video.videoHeight;
+    const scale = Math.min(1, 1000 / Math.max(vw, vh));
+    const cw = Math.round(vw * scale), ch = Math.round(vh * scale);
+    const c = document.createElement('canvas');
+    c.width = cw; c.height = ch;
+    const g = c.getContext('2d');
+    g.save();
+    if (camFacing === 'user') { g.translate(cw, 0); g.scale(-1, 1); }   // 与屏幕镜像一致
+    g.drawImage(video, 0, 0, cw, ch);
+    g.restore();
+
+    /* 骨骼线（与实时画面同一套平滑点） */
+    if (smooth) {
+        g.lineWidth = Math.max(3, cw / 180);
+        g.strokeStyle = 'rgba(126,224,194,.9)';
+        CONN.forEach(([a, b]) => {
+            g.beginPath();
+            g.moveTo(smooth[a].x * cw, smooth[a].y * ch);
+            g.lineTo(smooth[b].x * cw, smooth[b].y * ch);
+            g.stroke();
+        });
+        g.fillStyle = '#ffe08a';
+        [0, 11, 12, 15, 16, 23, 24].forEach(i => {
+            g.beginPath();
+            g.arc(smooth[i].x * cw, smooth[i].y * ch, Math.max(5, cw / 110), 0, 7);
+            g.fill();
+        });
+    }
+
+    /* 数据面板（取屏幕上正在显示的标签与数值，含校准结果） */
+    const labels = [1, 2, 3].map(i => $('r-l' + i).innerText);
+    const vals = [1, 2, 3].map(i => $('r-v' + i).innerText);
+    const fs = Math.max(15, Math.round(cw / 34));
+    g.font = `600 ${fs}px 'PingFang SC','Microsoft YaHei',sans-serif`;
+    const rowH = Math.round(fs * 1.9);
+    const lw = Math.max(...labels.map(s => g.measureText(s).width));
+    const vw2 = Math.max(...vals.map(s => g.measureText(s).width));
+    const pw = lw + vw2 + fs * 3.2, ph = rowH * 3 + fs * 2.4;
+    const px = 12, py = 12;
+    g.fillStyle = 'rgba(12,21,19,.72)';
+    if (g.roundRect) { g.beginPath(); g.roundRect(px, py, pw, ph, 12); g.fill(); }
+    else g.fillRect(px, py, pw, ph);
+    g.fillStyle = '#fff';
+    g.fillText(t(POSES[screenPose].nameKey), px + fs * .8, py + fs * 1.35);
+    vals.forEach((val, i) => {
+        const y = py + fs * 1.5 + rowH * (i + 1);
+        g.fillStyle = 'rgba(255,255,255,.75)';
+        g.font = `${Math.round(fs * .78)}px 'PingFang SC',sans-serif`;
+        g.fillText(labels[i], px + fs * .8, y + fs * .3);
+        g.fillStyle = '#ffe08a';
+        g.font = `700 ${fs}px 'PingFang SC',sans-serif`;
+        g.textAlign = 'right';
+        g.fillText(val, px + pw - fs * .8, y + fs * .3);
+        g.textAlign = 'left';
+    });
+    /* 等级角标 */
+    const gc = curGrade || 'g';
+    g.fillStyle = gc === 'g' ? '#22c55e' : gc === 'y' ? '#f39c12' : '#e74c3c';
+    const tag = gradeWord(gc);
+    g.font = `700 ${fs}px sans-serif`;
+    const tw = g.measureText(tag).width + fs * 1.4;
+    if (g.roundRect) { g.beginPath(); g.roundRect(cw - tw - 12, 12, tw, fs * 1.9, 999); g.fill(); }
+    else g.fillRect(cw - tw - 12, 12, tw, fs * 1.9);
+    g.fillStyle = '#fff';
+    g.fillText(tag, cw - tw / 2 - 12, 12 + fs * 1.35);
+    /* 时间戳 + 免责声明 */
+    g.font = `${Math.round(fs * .7)}px sans-serif`;
+    g.fillStyle = 'rgba(255,255,255,.85)';
+    g.textAlign = 'right';
+    const stamp = new Date().toLocaleString(curLang === 'zh' ? 'zh-CN' : 'en-US');
+    g.fillText(stamp + ' · SpineCare AI', cw - 12, ch - 12);
+    g.textAlign = 'left';
+
+    const full = c.toDataURL('image/jpeg', .85);
+
+    /* 报告缩略图（控制 localStorage 体积） */
+    const ts2 = Math.min(1, 480 / cw);
+    const tc = document.createElement('canvas');
+    tc.width = Math.round(cw * ts2); tc.height = Math.round(ch * ts2);
+    tc.getContext('2d').drawImage(c, 0, 0, tc.width, tc.height);
+    return { full, thumb: tc.toDataURL('image/jpeg', .7), vals, labels, grade: gc };
+}
+
+function addRecord(thumb, vals, labels, grade) {
+    const rec = {
+        id: Date.now(), ts: Date.now(),
+        pose: screenPose, poseName: t(POSES[screenPose].nameKey),
+        labels, vals, grade, img: thumb
+    };
+    reports.unshift(rec);
+    while (reports.length > 20) reports.pop();
+    try {
+        localStorage.setItem('jp_reports', JSON.stringify(reports));
+    } catch (e) {
+        /* 配额不足：丢图重试，仅保留数值记录 */
+        reports.forEach(r => { r.img = ''; });
+        try { localStorage.setItem('jp_reports', JSON.stringify(reports)); } catch (e2) { }
+        setStatus('rpFull', true);
+    }
+}
+
+function renderSnaps() {
+    const list = $('snaps');
+    list.innerHTML = '';
+    reports.slice(0, 6).forEach(r => {
+        const item = document.createElement('div');
+        item.className = 'snap';
+        const stamp = new Date(r.ts).toLocaleTimeString(curLang === 'zh' ? 'zh-CN' : 'en-US', { hour: '2-digit', minute: '2-digit' });
+        item.innerHTML = `<img src="${r.img}"><span>${r.poseName} ${r.vals[0]} · ${stamp}</span>`;
+        list.appendChild(item);
+    });
+}
+
+/* ---------- 我的报告 ---------- */
+const gradeRank = { g: 0, y: 1, r: 2 };
+function gradeColor(g) { return g === 'g' ? '#22c55e' : g === 'y' ? '#f39c12' : '#e74c3c'; }
+function renderReport() {
+    $('rp-n').innerText = reports.length;
+    $('rp-last').innerText = reports.length ? gradeWord(reports[0].grade) : '--';
+    $('rp-last').style.color = reports.length ? gradeColor(reports[0].grade) : '#23423c';
+    let worst = null;
+    reports.forEach(r => { if (worst === null || gradeRank[r.grade] > gradeRank[worst]) worst = r.grade; });
+    $('rp-worst').innerText = worst ? gradeWord(worst) : '--';
+    $('rp-worst').style.color = worst ? gradeColor(worst) : '#23423c';
+    const list = $('report-list');
+    if (!reports.length) { list.innerHTML = `<div class="rp-empty">${t('rpEmpty')}</div>`; return; }
+    list.innerHTML = reports.map(r => `
+        <div class="rp-item" onclick="viewRecord(${r.id})">
+            ${r.img ? `<img src="${r.img}" alt="">` : ''}
+            <div class="rp-main">
+                <div class="rp-top">
+                    <span class="rp-pose">${r.poseName}</span>
+                    <span class="rp-tag" style="background:${gradeColor(r.grade)}">${gradeWord(r.grade)}</span>
+                </div>
+                <div class="rp-time">${new Date(r.ts).toLocaleString(curLang === 'zh' ? 'zh-CN' : 'en-US')}</div>
+                <div class="rp-vals">${r.labels.map((l, i) => `${l}: ${r.vals[i] || '--'}`).join(' · ')}</div>
+            </div>
+        </div>`).join('');
+}
+window.viewRecord = function (id) {
+    const r = reports.find(x => x.id === id);
+    if (r && r.img) { $('shot-img').src = r.img; $('shot-wrap').classList.add('on'); }
+};
+window.clearReport = function () {
+    reports = [];
+    localStorage.removeItem('jp_reports');
+    renderReport(); renderSnaps();
+    setStatus('rpClearOk', true);
+};
+
+/* ---------- 倒计时拍照 / 手势拍照 ---------- */
+window.countdownShot = function () {
+    if (cdRunning) return;
+    if (!video.videoWidth) { setStatus('snapFail', true); return; }
+    cdRunning = true;
+    closeShot();
+    const cd = $('cd'), num = cd.querySelector('b');
+    cd.style.display = 'flex';
+    let n = 3;
+    num.innerText = n;
+    const timer = setInterval(() => {
+        n--;
+        if (n <= 0) {
+            clearInterval(timer);
+            cd.style.display = 'none';
+            cdRunning = false;
+            snapshot();
+        } else {
+            num.innerText = n;
+        }
+    }, 1000);
+};
+window.toggleGesture = function () {
+    gestureOn = !gestureOn;
+    const b = $('gesture-btn');
+    b.classList.toggle('toggled', gestureOn);
+    b.innerText = t(gestureOn ? 'snapGesOn' : 'snapGesBtn');
+};
+window.saveShot = function () {
+    const a = document.createElement('a');
+    a.href = $('shot-img').src;
+    a.download = 'spinecare-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.jpg';
+    a.click();
+};
+window.closeShot = function () { $('shot-wrap').classList.remove('on'); };
 
 /* ---------- 主循环 ---------- */
 function loop() {
     if (!running) return;
     if (video.readyState >= 2 && video.videoWidth) {
+        /* 画布位图尺寸对齐视频原始分辨率，保证骨骼与画面逐像素对齐 */
+        if (overlay.width !== video.videoWidth) {
+            overlay.width = video.videoWidth;
+            overlay.height = video.videoHeight;
+        }
         const now = performance.now();
         if (video.currentTime !== lastVideoTime) {
             lastVideoTime = video.currentTime;
@@ -740,7 +1184,40 @@ function draw(res) {
     const shTilt = Math.atan2(Math.abs(ls.y - rs.y), Math.abs(rs.x - ls.x)) * 180 / Math.PI;
     const hipTilt = Math.atan2(Math.abs(lh.y - rh.y), Math.abs(rh.x - lh.x)) * 180 / Math.PI;
     const maxTilt = Math.max(shTilt, hipTilt);
-    const v = { lm, ls, rs, lh, rh, nose, shW, shM, hpM, earM, torsoLen, maxTilt, deg: r => (r * 180 / Math.PI).toFixed(1) + '°' };
+    const v = { lm, ls, rs, lh, rh, nose, shW, shM, hpM, earM, torsoLen, maxTilt, deg: r => (r * 180 / Math.PI).toFixed(1) + '°',
+        /* 与竖直向上方向 (0,-1) 的夹角（弧度）：站立=0，水平=90°；acos 有界，永不越 180 */
+        angleUp(from, to) {
+            const dx = to.x - from.x, dy = to.y - from.y;
+            const n = Math.hypot(dx, dy) || 1e-6;
+            return Math.acos(Math.max(-1, Math.min(1, -dy / n)));
+        },
+        angleUp3(from, to) {  // 含深度 z 的三维版本（前屈弯腰：折叠量主要表现在 z 轴）
+            const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
+            const n = Math.hypot(dx, dy, dz) || 1e-6;
+            return Math.acos(Math.max(-1, Math.min(1, -dy / n)));
+        } };
+
+    /* ---- 全身入镜检测：头顶 / 脚踝是否出画，实时提示站位 ---- */
+    updateFit(lm);
+
+    /* ---- 手势拍照：单手举过头顶保持约 0.6 秒 → 自动进入 3 秒倒计时 ---- */
+    if (gestureOn && mode === 'screen' && !usingSim && !cdRunning) {
+        const handL = (lm[15].visibility ?? 1) > 0.4 && lm[15].y < nose.y - 0.06;
+        const handR = (lm[16].visibility ?? 1) > 0.4 && lm[16].y < nose.y - 0.06;
+        const nowMs = Date.now();
+        if ((handL || handR) && nowMs > gestureCooldown) {
+            gestureHold++;
+            if (gestureHold >= 18) {          // ~0.6s @30fps
+                gestureHold = 0;
+                gestureCooldown = nowMs + 8000;   // 冷却 8s，避免连续误拍
+                countdownShot();
+            }
+        } else {
+            gestureHold = 0;
+        }
+    } else {
+        gestureHold = 0;
+    }
 
     /* ---- 按当前体位更新指标 UI（数值实时刷新，分级需连续 4 帧确认防闪烁） ---- */
     {
@@ -839,9 +1316,29 @@ function showWarn(key, arg, now) {
     setTimeout(() => { w.style.display = 'none'; }, 3000);
 }
 
+/* 全身入镜提示：头顶 / 脚踝出画时给出明确站位指引 */
+function updateFit(lm) {
+    const f = $('fit');
+    if (mode !== 'screen' || usingSim) { f.classList.remove('show'); fitShown = ''; return; }
+    const nose = lm[0], la = lm[27], ra = lm[28];
+    const headIn = nose.y > 0.02 && (nose.visibility ?? 1) > 0.3;
+    const feetIn = (la.visibility ?? 1) > 0.35 && (ra.visibility ?? 1) > 0.35 && la.y < 0.98 && ra.y < 0.98;
+    const key = !headIn ? 'fitHead' : !feetIn ? 'fitFeet' : 'fitOk';
+    if (key === fitShown) return;
+    fitShown = key;
+    f.innerText = t(key);
+    f.classList.toggle('ok', key === 'fitOk');
+    f.classList.add('show');
+    if (key === 'fitOk') {
+        setTimeout(() => { if (fitShown === 'fitOk') { f.classList.remove('show'); fitShown = ''; } }, 2500);
+    }
+}
+
 /* ---------- 初始化 ---------- */
 $('qi').innerText = qi;
 applyLang();
+renderSnaps();
+renderReport();
 </script>
 </body>
 </html>
