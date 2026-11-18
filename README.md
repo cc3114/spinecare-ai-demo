@@ -4,11 +4,6 @@
 
 **An at-home scoliosis and posture screening PWA that runs entirely in the browser — no backend, no uploads, no installation.**
 
-[![Vanilla JS](https://img.shields.io/badge/Vanilla-JavaScript-f7df1e?logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
-[![MediaPipe](https://img.shields.io/badge/MediaPipe-Tasks%20Vision%200.10.14-4285f4)](https://developers.google.com/mediapipe)
-[![Single File](https://img.shields.io/badge/build-ff0000d-single--file-success)](#)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
-
 </div>
 
 ---
