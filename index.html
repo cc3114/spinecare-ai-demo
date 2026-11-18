@@ -1386,7 +1386,10 @@ function draw(res) {
         if (usingSim) return;                 // 模拟模式不出假数据
         const earL = lm[7], earR = lm[8];
         const wL = lm[15], wR = lm[16];
-        const shrug = Math.min((earL.y - ls.y), (earR.y - rs.y)) / shW;
+        /* 肩耳距（耸肩指标）：肩到耳的垂直距离 / 肩宽。图像坐标 y 向下，耳朵在肩上方，
+           正常站立约 0.6~0.9；耸肩时肩上抬、距离缩小。旧公式 (ear.y - sh.y) 为负值，
+           导致 shrug<0.16 恒成立、永久误报，已修正方向。 */
+        const shrug = Math.min((ls.y - earL.y), (rs.y - earR.y)) / shW;
         const visOk = (ls.visibility ?? 1) > 0.5 && (rs.visibility ?? 1) > 0.5 &&
                       (wL.visibility ?? 1) > 0.4 && (wR.visibility ?? 1) > 0.4;
         const leanDeg = v.angleUp(hpM, shM) * 180 / Math.PI;   // 躯干倾角
@@ -1469,6 +1472,90 @@ function updateFit(lm) {
         setTimeout(() => { if (fitShown === 'fitOk') { f.classList.remove('show'); fitShown = ''; } }, 2500);
     }
 }
+
+/* ---------- 演示模式（URL 加 ?demo=1）：无摄像头环境用画布动画人物 + 预置关键点驱动全部 UI ----------
+   用途：产品演示、截图、UI 调试。骨骼覆盖层、指标面板、计次逻辑与真实模式完全一致。 */
+(function startDemo() {
+    if (!new URLSearchParams(location.search).has('demo')) return;
+    window.startEngine = async function () { /* 演示模式：无需真实摄像头，避免竞态进入模拟模式 */ };
+    const dc = document.createElement('canvas');
+    dc.width = 720; dc.height = 960;
+    const dg = dc.getContext('2d');
+    /* 基础站位（背面视角）：所有部位均为 [左, 右] 两组 [x, y] 坐标对；轻微高低肩让分级显示更真实 */
+    const B = {
+        nose: [0.500, 0.120],
+        ear: [[0.462, 0.115], [0.538, 0.115]],
+        eye: [[0.478, 0.100], [0.522, 0.100]],
+        mouth: [[0.487, 0.150], [0.513, 0.150]],
+        sh: [[0.410, 0.272], [0.590, 0.268]],
+        el: [[0.380, 0.400], [0.620, 0.400]],
+        wr: [[0.372, 0.520], [0.628, 0.520]],
+        hip: [[0.450, 0.550], [0.550, 0.550]],
+        knee: [[0.455, 0.720], [0.545, 0.720]],
+        ank: [[0.460, 0.880], [0.540, 0.880]],
+        heel: [[0.452, 0.900], [0.548, 0.900]],
+        foot: [[0.478, 0.925], [0.572, 0.925]]
+    };
+    const P = (...pts) => pts.map(p => ({ x: p[0], y: p[1], z: 0, visibility: 1 }));
+    let t0 = performance.now();
+
+    function landmarks() {
+        /* 跟练·双手托天：手臂 5 秒周期上举过头再放下，其余场景保持站立 */
+        const t = (performance.now() - t0) / 1000;
+        const p = (mode === 'train' && exMode === 1) ? 0.5 - 0.5 * Math.cos(t * 1.25) : 0;
+        const wr = [[B.wr[0][0] + p * 0.065, B.wr[0][1] + p * -0.46], [B.wr[1][0] + p * -0.065, B.wr[1][1] + p * -0.46]];
+        const el = [[B.el[0][0] + p * 0.045, B.el[0][1] + p * -0.21], [B.el[1][0] + p * -0.045, B.el[1][1] + p * -0.21]];
+        const hd = [[wr[0][0] - 0.004, wr[0][1] + 0.028], [wr[1][0] + 0.004, wr[1][1] + 0.028]];
+        return P(B.nose, B.eye[0], B.eye[0], B.eye[0], B.eye[1], B.eye[1], B.eye[1],
+            B.ear[0], B.ear[1], B.mouth[0], B.mouth[1],
+            B.sh[0], B.sh[1], el[0], el[1], wr[0], wr[1],
+            hd[0], hd[1], hd[0], hd[1], hd[0], hd[1],
+            B.hip[0], B.hip[1], B.knee[0], B.knee[1],
+            B.ank[0], B.ank[1], B.heel[0], B.heel[1], B.foot[0], B.foot[1]);
+    }
+
+    function paint(lm) {
+        const W = dc.width, H = dc.height, u = W;
+        const g = dg.createLinearGradient(0, 0, 0, H);
+        g.addColorStop(0, '#101c19'); g.addColorStop(1, '#1a2c27');
+        dg.fillStyle = g; dg.fillRect(0, 0, W, H);
+        dg.strokeStyle = 'rgba(126,224,194,.10)';   /* 地板线 */
+        for (let y = H * .78; y < H; y += H * .05) { dg.beginPath(); dg.moveTo(0, y); dg.lineTo(W, y); dg.stroke(); }
+        const pt = i => [lm[i].x * u, lm[i].y * H];
+        dg.lineCap = 'round'; dg.lineJoin = 'round';
+        /* 躯干 / 四肢 */
+        dg.strokeStyle = 'rgba(168,196,188,.85)'; dg.lineWidth = u * .085;
+        dg.beginPath(); const [lsx, lsy] = pt(11), [rsx, rsy] = pt(12), [lhx, lhy] = pt(23), [rhx, rhy] = pt(24);
+        dg.moveTo(lsx, lsy); dg.quadraticCurveTo((lsx + rsx) / 2, (lsy + rhy) / 2, rsx, rsy);
+        dg.moveTo(lsx, lsy); dg.lineTo(lhx, lhy); dg.lineTo(rhx, rhy); dg.lineTo(rsx, rsy); dg.stroke();
+        dg.lineWidth = u * .062;
+        [[13, 15], [14, 16]].forEach(([e, w]) => { const [ax, ay] = pt(e), [bx, by] = pt(w); dg.beginPath(); dg.moveTo(pt(e === 13 ? 11 : 12)[0], pt(e === 13 ? 11 : 12)[1]); dg.lineTo(ax, ay); dg.lineTo(bx, by); dg.stroke(); });
+        [[23, 25, 27, 31], [24, 26, 28, 32]].forEach(chain => {
+            dg.beginPath(); dg.moveTo(...pt(chain[0]));
+            chain.forEach(i => dg.lineTo(...pt(i))); dg.stroke();
+        });
+        /* 头部 */
+        const [nx, ny] = pt(0);
+        dg.fillStyle = 'rgba(168,196,188,.85)';
+        dg.beginPath(); dg.arc(nx, ny + u * .012, u * .055, 0, 7); dg.fill();
+    }
+
+    video.muted = true;
+    paint(landmarks());                       /* 先画一帧，确保流立即有首帧 */
+    video.srcObject = dc.captureStream(30);
+    video.play().then(() => {
+        video.classList.remove('mirror'); overlay.classList.remove('mirror');
+        $('sim').style.display = 'none';
+        setStatus('ready', false);
+        running = true;
+        landmarker = { detectForVideo: () => ({ landmarks: [landmarks()] }) };
+        requestAnimationFrame(function demoPaint() {
+            try { paint(landmarks()); } catch (e) { console.error('demo paint:', e); }
+            requestAnimationFrame(demoPaint);
+        });
+        requestAnimationFrame(loop);
+    }).catch(e => { console.error('demo play:', e); usingSim = true; $('sim').style.display = 'flex'; });
+})();
 
 /* ---------- 初始化 ---------- */
 $('qi').innerText = qi;

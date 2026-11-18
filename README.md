@@ -90,6 +90,8 @@ python3 -m http.server 8000
 npx serve .
 ```
 
+**Demo mode:** append `?demo=1` to the URL to explore the full UI (skeleton overlay, live metrics, rep counting) without a camera or a person in frame — a canvas-animated figure feeds pre-defined landmarks through the real pipeline. Ideal for screenshots and quick reviews.
+
 **Build:** none. Deploy by serving the directory as-is (static hosting is enough — GitHub Pages, Netlify, nginx, etc.).
 
 ## Project Structure
