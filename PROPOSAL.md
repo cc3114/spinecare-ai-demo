@@ -327,37 +327,37 @@ The product will not output diagnostic labels, will not recommend treatment, and
 
 ### Phase 1 — MVP proof of concept ✅ *current stage*
 
-- [x] On-device pose inference (33 landmarks, float16, GPU delegate) in-browser
-- [x] Three screening poses with pose-specific metrics and clinical-style thresholds
-- [x] Bounded vector-angle engine (2D + 3D depth variant), unit-tested
-- [x] Per-pose zero-point calibration with relative-value display
-- [x] Full-body framing check and live stance prompts
-- [x] Five corrective exercises with form-gated rep counting
-- [x] Per-exercise stance guide in plain language
-- [x] Countdown capture + OK-gesture capture (21-landmark hand model, lazy-loaded)
-- [x] In-canvas evidence composite (frame + skeleton + metrics + timestamp) and JPEG export
-- [x] Local measurement history (20 records) with grade statistics
-- [x] Complete bilingual UI (zh/en), camera switching, simulation and demo fallbacks
+Shipped, running, and demonstrable today:
+
+- **On-device pose inference** — 33 landmarks, float16 model, GPU delegate, in-browser via WASM.
+- **Three screening poses** — back, side, and forward-bend, each with its own metrics and clinical-style thresholds.
+- **Bounded vector-angle engine** — 2D and 3D (depth-aware) variants, unit-tested against known geometries.
+- **Per-pose zero-point calibration** — relative-value display that cancels phone tilt and natural asymmetry.
+- **Framing and stance coaching** — full-body check plus pose-specific live prompts.
+- **Five corrective exercises** — form-gated rep counting, stance guides in plain language, on-screen correction warnings.
+- **Hands-free capture** — 3-second countdown and OK-gesture trigger via a lazily loaded 21-landmark hand model.
+- **Evidence composite** — skeleton, metrics, and timestamp burned into a downloadable JPEG.
+- **Local history** — 20 records with thumbnails, latest/worst grade statistics, full-image review.
+- **Bilingual interface** — complete Chinese/English UI, camera switching, simulation and demo fallbacks.
 
 ### Phase 2 — Productization and multi-device polish *(1–3 months)*
 
-- [ ] True PWA: web app manifest + service-worker offline caching of runtime and models
-- [ ] Multi-profile support (multiple children / family members) with per-profile baselines
-- [ ] Longitudinal trend charts (per-metric, per-pose) and PDF/CSV export for clinical conversations
-- [ ] Exercise programs: assign a multi-week corrective plan instead of single exercises
-- [ ] Threshold tuning from a labelled dataset of real captures; publish sensitivity/specificity against clinician assessment
-- [ ] Accessibility and low-end-device performance pass (frame-rate adaptation, reduced-motion mode)
-- [ ] Optional spoken/audible cues for visually impaired users and for hands-free sessions
+- **True PWA** — web app manifest plus service-worker caching so the runtime and models load offline.
+- **Multi-profile support** — separate baselines and histories for each family member.
+- **Trend visualization** — per-metric, per-pose longitudinal charts, with PDF/CSV export for clinical conversations.
+- **Structured programmes** — multi-week corrective plans instead of standalone exercises.
+- **Evidence-based thresholds** — tune cut-offs against a labelled capture set and publish sensitivity/specificity versus clinician assessment.
+- **Performance and accessibility** — frame-rate adaptation for low-end devices, reduced-motion mode, optional audible cues.
 
 ### Phase 3 — Ecosystem and institutional pilots *(6–12 months)*
 
-- [ ] Encrypted, opt-in cloud backup with explicit consent flow
-- [ ] Clinician-facing review dashboard (patient-shared, read-only adherence and trend view)
-- [ ] Clinic pilot: 1–2 rehabilitation practices, measuring adherence lift and measurement consistency
-- [ ] Employer EAP pilot with anonymized aggregate reporting
-- [ ] Expanded exercise library with progression levels and regression variants
-- [ ] Optional LLM-assisted narrative summaries of a user's own trend data (clearly labelled as generated text, never as diagnosis)
-- [ ] Regulatory review in target markets to confirm wellness positioning before any clinical claim is considered
+- **Encrypted cloud backup** — opt-in, consent-gated, never required for core function.
+- **Clinician review dashboard** — read-only, patient-shared adherence and trend view.
+- **Clinic pilot** — 1–2 rehabilitation practices, measuring adherence lift and measurement consistency.
+- **Employer EAP pilot** — anonymized aggregate participation reporting only.
+- **Exercise library expansion** — progression and regression variants per movement.
+- **Narrative trend summaries** — optional generated text over the user's own data, clearly labelled as generated and never as diagnosis.
+- **Regulatory review** — confirm wellness positioning in target markets before any clinical claim is considered.
 
 ---
 
