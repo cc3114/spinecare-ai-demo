@@ -15,13 +15,12 @@
 
 ## Preview / Demo
 
-> Screenshots are placeholders — replace them with your own captures.
+> Screenshots captured from the app's built-in demo mode (`?demo=1`).
 
 | Measurement (back view) | Exercise training | Stance guide |
 | :---: | :---: | :---: |
 | ![Measurement demo](./assets/demo-screen.png) | ![Training demo](./assets/demo-train.png) | ![Stance guide](./assets/demo-stance.png) |
-
-**Recommended captures:** the measurement view with the live skeleton overlay and metric panel (back view, green grade dot visible), and the exercise rep counter mid-workout. A short screen recording of the OK-gesture-triggered countdown photo also works well as a GIF.
+| *Real-time posture assessment with a live skeleton overlay — shoulder tilt, head offset and plumb metrics, color-coded grade, and full-body framing check.* | *Form-gated rep counting for five guided exercises. A rep is only credited when the movement stays standard; the left panel explains each exercise in plain language.* | *Per-exercise stance guide shown before training starts — it names the required camera position (e.g. side-on, back against the wall) and lists the step-by-step requirements.* |
 
 ## Features
 
