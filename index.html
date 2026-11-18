@@ -231,6 +231,26 @@
     .stage .fit-hint.show { display: block; }
     .live-metrics .lm b { font-size: 14.5px; }
 
+    /* ===== 站立方式引导页：点击训练动作后自动弹出 ===== */
+    .stance-wrap {
+        position: fixed; top: 0; bottom: 0; left: 0; right: 0; margin: 0 auto;
+        max-width: 480px; z-index: 90; display: none;
+        background: rgba(6, 14, 12, .86); justify-content: center; align-items: center; padding: 18px;
+    }
+    .stance-wrap.on { display: flex; }
+    .stance-card {
+        background: #fff; color: #173a33; border-radius: 18px; padding: 22px 20px;
+        max-width: 360px; width: 100%; max-height: 82vh; overflow: auto; text-align: left;
+    }
+    .stance-badge {
+        display: inline-block; background: #2c5e55; color: #fff; font-weight: 700;
+        padding: 6px 14px; border-radius: 999px; font-size: 13px; margin-bottom: 10px;
+    }
+    .stance-card h3 { margin: 2px 0 12px; font-size: 19px; }
+    .stance-card ul { margin: 0 0 16px; padding: 0; list-style: none; }
+    .stance-card li { position: relative; padding-left: 22px; margin-bottom: 9px; font-size: 13.5px; line-height: 1.55; color: #2f4f49; }
+    .stance-card li::before { content: '✔'; position: absolute; left: 0; color: #2c9c7f; font-weight: 700; }
+
     /* ===== 拍照结果：全屏覆盖层（报告页也能打开） ===== */
     .shot-wrap {
         position: fixed; top: 0; bottom: 0; left: 0; right: 0; margin: 0 auto;
@@ -300,7 +320,7 @@
     <div class="topbar">
         <div class="tb-left">
             <span class="tb-back" onclick="showHome()">‹</span>
-            <div class="brand"><span id="brand-name">脊正 · 真机版</span><small>SPINECARE AI · V13</small></div>
+            <div class="brand"><span id="brand-name">脊正 · 真机版</span><small>SPINECARE AI · V14</small></div>
         </div>
         <div class="top-right">
             <div class="qi"><span data-i18n="qiLabel">正气值</span> <b id="qi">0</b></div>
@@ -434,6 +454,16 @@
         </div>
     </div>
 
+    <!-- 站立方式引导页：选择训练动作后自动跳转，告知站位与动作要求 -->
+    <div class="stance-wrap" id="stance-wrap">
+        <div class="stance-card">
+            <div class="stance-badge" id="stance-badge">侧面 · 站立</div>
+            <h3 id="stance-name">动作名称</h3>
+            <ul id="stance-reqs"></ul>
+            <button class="btn primary" style="width:100%;" onclick="closeStance()" data-i18n="stanceGo">✅ 我准备好了，开始训练</button>
+        </div>
+    </div>
+
     <div class="tabbar">
         <div class="tab on" onclick="switchTab(0)"><span class="ic">🩻</span><span data-i18n="tabScreen">测量</span></div>
         <div class="tab" onclick="switchTab(1)"><span class="ic">🧘</span><span data-i18n="tabTrain">跟练</span></div>
@@ -503,17 +533,10 @@ const I18N = {
         bendOk: '已到位', bendMore: '再弯一点', bendGo: '请弯腰',
         ex1: '双手托天', ex2: '沉肩静站', ex3: '小燕飞背伸', ex4: '猫式伸展', ex5: '靠墙天使',
         rep1: '双手托天 · 次', rep3: '小燕飞 · 次', rep4: '猫式伸展 · 次', rep5: '靠墙天使 · 次',
-        rulesTitle: 'AI 实时纠错规则',
-        rules: [
-            ['双手托天', '手腕过鼻尖计 1 次'],
-            ['小燕飞', '俯卧躯干抬起 ≥20° 计 1 次'],
-            ['猫式伸展', '低头→抬头一个来回计 1 次'],
-            ['靠墙天使', '手臂上滑过头回落计 1 次'],
-            ['离墙检测', '手腕离墙过远 → 贴墙滑动'],
-            ['耸肩检测', '肩耳距过近 → 沉肩坠肘'],
-            ['歪斜检测', '高低肩 ≥6° → 身体回正']
-        ],
-        trainNote: '提示：小燕飞 / 猫式伸展请让孩子侧对镜头做；靠墙天使背对镜头、手臂贴墙上滑。训练时整个人进入画面（摄像头能看到肩、髋），AI 才能稳定识别。每次完成动作 +5 正气值。',
+        rulesTitle: '动作要求',
+        poseStance: '站位',
+        stanceGo: '✅ 我准备好了，开始训练',
+        trainNote: '提示：小燕飞 / 猫式伸展 / 靠墙天使请侧对镜头做（靠墙天使背贴墙），双手托天、沉肩静站背对镜头做。选择动作后会自动显示站位要求页。训练时整个人进入画面（摄像头能看到肩、髋），AI 才能稳定识别；动作全程指标达标才计次，每次 +5 正气值。',
         aboutTitle: '运行说明',
         aboutText: '· 本页使用 MediaPipe Pose Landmarker 在浏览器端侧推理，画面不会上传服务器。<br>· 摄像头要求 HTTPS 或 localhost 环境；在手机上请通过 https 链接打开。<br>· 首次启动需联网下载约 5MB 模型，之后浏览器会缓存。<br>· 判定结果仅供家庭初筛参考，确诊请到医院骨科拍 X 光。',
         modelTitle: '模型源（国内网络不通时可替换镜像地址）',
@@ -580,17 +603,10 @@ const I18N = {
         bendOk: 'Good', bendMore: 'Bend more', bendGo: 'Bend forward',
         ex1: 'Arm raise', ex2: 'Shoulder release', ex3: 'Back extension', ex4: 'Cat-cow stretch', ex5: 'Wall angel',
         rep1: 'Arm raise · reps', rep3: 'Back extension · reps', rep4: 'Cat-cow · reps', rep5: 'Wall angel · reps',
-        rulesTitle: 'Real-time correction rules',
-        rules: [
-            ['Arm raise', 'Wrist above nose = 1 rep'],
-            ['Back extension', 'Torso lift ≥20° = 1 rep'],
-            ['Cat-cow', 'Head down → up = 1 rep'],
-            ['Wall angel', 'Arm slide up and down = 1 rep'],
-            ['Wall contact', 'Wrist off wall → slide along the wall'],
-            ['Shrug check', 'Shoulder too close to ear → relax'],
-            ['Tilt check', 'Shoulder tilt ≥6° → straighten up']
-        ],
-        trainNote: 'Tip: do the back extension and cat-cow side-on to the camera; for the wall angel, face away from the camera and slide your arms along the wall. Keep the whole body in frame (shoulders and hips visible) for stable detection. Each rep earns +5 Qi points.',
+        rulesTitle: 'How to do it',
+        poseStance: 'Stance',
+        stanceGo: '✅ Ready — start training',
+        trainNote: 'Tip: do back extension / cat-cow / wall angel side-on to the camera (back against the wall for wall angel); arm raise and shoulder release with your back to the camera. A stance guide page pops up when you pick an exercise. Keep the whole body in frame (shoulders and hips visible); a rep counts only when your form stays standard throughout. Each rep earns +5 Qi points.',
         aboutTitle: 'How it works',
         aboutText: '· Runs MediaPipe Pose Landmarker on-device in your browser; video never leaves the phone.<br>· The camera requires HTTPS or localhost — open the https link on your phone.<br>· The first launch downloads a ~5MB model, then the browser caches it.<br>· Results are for family screening only. For diagnosis, see a doctor and take an X-ray.',
         modelTitle: 'Model source (set a mirror URL if blocked)',
@@ -716,9 +732,64 @@ function applyPoseTexts() {
     $('hint').innerText = P.hint[curLang];
     $('r-note').innerText = P.note[curLang];
 }
-function renderRules() {
-    $('rules').innerHTML = t('rules').map(r => `<div class="rule"><span>${r[0]}</span><b>${r[1]}</b></div>`).join('');
+/* 各训练动作的站位与动作要求（用户可读语言）；pose 为联动的筛查体位页 */
+const EX_INFO = {
+    1: {
+        pose: 'back',
+        stance: { zh: '背面 · 背对镜头站立', en: 'Back view · Stand facing away' },
+        reqs: {
+            zh: ['背对镜头自然站立，双脚分开与肩同宽，手臂放松垂在体侧', '双臂从身体两侧慢慢上举，举过头顶到最高点', '举起时肩膀放松下沉，不要耸肩，身体不要左右歪斜', '再慢慢放下回到体侧，一上一下算 1 次'],
+            en: ['Stand with your back to the camera, feet shoulder-width, arms relaxed at your sides', 'Raise both arms slowly out to the sides and overhead', 'Keep shoulders relaxed as you lift — no shrugging, no leaning', 'Lower them slowly — one up-and-down cycle counts as 1 rep']
+        }
+    },
+    2: {
+        pose: 'back',
+        stance: { zh: '背面 · 背对镜头站立', en: 'Back view · Stand facing away' },
+        reqs: {
+            zh: ['背对镜头自然站立，全身放松，目视前方', '双肩主动下沉，远离耳朵，保持住不要动', '检测到耸肩会提醒你，调整后继续坚持', '这是静力训练，不计数，坚持越久越好'],
+            en: ['Stand with your back to the camera, relaxed, eyes forward', 'Actively drop both shoulders away from your ears and hold', 'You get a warning if you shrug — adjust and keep holding', 'This is a static hold, no reps — the longer the better']
+        }
+    },
+    3: {
+        pose: 'side',
+        stance: { zh: '侧面 · 俯卧位', en: 'Side view · Lying face down' },
+        reqs: {
+            zh: ['侧对镜头，趴在垫子或床上（俯卧），手臂放身体两侧', '上背部发力，头和胸口慢慢抬离地面', '抬起约 20°~45° 即可，不要抬太高，保护腰椎', '再慢慢放下回到俯卧位，一抬一放算 1 次'],
+            en: ['Lie face down on a mat, side-on to the camera, arms at your sides', 'Use your upper back to lift your head and chest off the floor', 'Lift about 20°–45° — not higher, to protect your lower back', 'Lower down slowly — one lift-and-lower cycle counts as 1 rep']
+        }
+    },
+    4: {
+        pose: 'side',
+        stance: { zh: '侧面 · 跪姿', en: 'Side view · On hands and knees' },
+        reqs: {
+            zh: ['侧对镜头，四点跪姿：双手撑地、双膝着地', '先低头看肚子，背部慢慢向上拱起（猫式）', '再慢慢抬头塌腰，背部向下沉（牛式）', '一个「拱起-塌腰」来回算 1 次'],
+            en: ['On hands and knees, side-on to the camera', 'Tuck your chin and round your back up (cat)', 'Then lift your head and let your belly drop (cow)', 'One cat-cow cycle counts as 1 rep']
+        }
+    },
+    5: {
+        pose: 'side',
+        stance: { zh: '侧面 · 背贴墙站立', en: 'Side view · Back against a wall' },
+        reqs: {
+            zh: ['侧对镜头，背贴墙站立，双脚离墙约一小步', '双臂放体侧，手背贴墙，慢慢沿墙上滑', '滑到头顶最高点时肩膀放松，不要耸肩，身体保持直立', '再慢慢滑回体侧，一上一下算 1 次'],
+            en: ['Stand side-on to the camera with your back against a wall', 'Arms at your sides, backs of hands on the wall — slide them up slowly', 'At the top keep shoulders relaxed (no shrugging) and body upright', 'Slide back down slowly — one up-and-down cycle counts as 1 rep']
+        }
+    }
+};
+function renderExRules(n) {
+    const info = EX_INFO[n];
+    const reqs = info.reqs[curLang];
+    $('rules').innerHTML =
+        `<div class="rule"><span>${t('poseStance')}</span><b>${info.stance[curLang]}</b></div>` +
+        reqs.map(r => `<div class="rule"><span>✔</span><b>${r}</b></div>`).join('');
 }
+window.showStance = function (n) {
+    const info = EX_INFO[n];
+    $('stance-badge').innerText = info.stance[curLang];
+    $('stance-name').innerText = t('ex' + n);
+    $('stance-reqs').innerHTML = info.reqs[curLang].map(r => `<li>${r}</li>`).join('');
+    $('stance-wrap').classList.add('on');
+};
+window.closeStance = function () { $('stance-wrap').classList.remove('on'); };
 function gradeWord(g) { return g === 'g' ? t('gradeG') : g === 'y' ? t('gradeY') : t('gradeR'); }
 function renderGrade() {
     if (!curGrade) return;
@@ -732,7 +803,7 @@ function applyLang() {
     document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
     $('brand-name').innerText = t('brand');
     $('lang-btn').innerText = curLang === 'zh' ? 'EN' : '中文';
-    renderRules();
+    renderExRules(exMode);
     applyPoseTexts();
     renderStatus();
     renderGrade();
@@ -915,6 +986,9 @@ window.pickEx = function (n) {
     $('rep-label').innerText = n === 2 ? '' : t('rep' + n);
     reps = 0; $('rep-num').innerText = 0;
     formOk = true; formBadCnt = 0; wasRaised = false; wasLifted = false; catPhase = 'none';
+    renderExRules(n);          // 左侧提示框换成该动作的要求
+    if (screenPose !== EX_INFO[n].pose) pickPose(EX_INFO[n].pose);  // 自动跳到所需站立方式页
+    showStance(n);             // 弹出站位引导页
 };
 
 /* ---------- 拍照：合成「画面 + 骨骼 + 实时数据」→ 取景框内展示 + 存入报告 ---------- */
@@ -1317,10 +1391,15 @@ function draw(res) {
                       (wL.visibility ?? 1) > 0.4 && (wR.visibility ?? 1) > 0.4;
         const leanDeg = v.angleUp(hpM, shM) * 180 / Math.PI;   // 躯干倾角
 
-        /* 计次门槛：起势时重置合规标记；任一指标越界连续 3 帧即判动作不标准 */
+        /* 计次门槛：起势时重置合规标记；任一指标越界连续 3 帧即判动作不标准。
+           通用门槛按站位区分：背面站立查高低肩+躯干侧倾；侧面站立只查躯干前后倾（侧面两肩重叠，高低肩不可测）；
+           小燕飞/猫式为俯卧、跪姿，躯干水平是动作本身要求，不做直立检查 */
         const formStart = () => { formOk = true; formBadCnt = 0; };
         const formViolate = () => { if (++formBadCnt >= 3) formOk = false; };
-        if (!visOk || maxTilt >= 2.5 || leanDeg >= 10) formViolate(); else formBadCnt = 0;
+        let gateOk = visOk;
+        if (exMode === 1 || exMode === 2) gateOk = gateOk && maxTilt < 2.5 && leanDeg < 10;
+        if (exMode === 5) gateOk = gateOk && leanDeg < 10;
+        if (!gateOk) formViolate(); else formBadCnt = 0;
 
         const award = () => {
             if (!formOk) { showWarn('warnForm', null, now); return; }   // 不标准不计次
@@ -1353,20 +1432,14 @@ function draw(res) {
             }
             else if (e < -0.22 && catPhase === 'down') { award(); catPhase = 'none'; }
         }
-        if (exMode === 5) {                       // 靠墙天使：手臂贴墙上滑过头回落
-            const zDev = Math.abs((wL.z + wR.z) / 2 - shM.z);
-            if (zDev > 0.16) {
-                formViolate();
-                showWarn('warnWall', null, now);
-                wasRaised = false;
-            } else {
-                const up = wL.y < nose.y && wR.y < nose.y;
-                if (up && !wasRaised) formStart();
-                if (wasRaised && !up && wL.y > ls.y && wR.y > rs.y) award();
-                wasRaised = up;
-            }
+        if (exMode === 5) {                       // 靠墙天使：侧对镜头，背贴墙，双臂沿墙上滑过头回落
+            const up = wL.y < nose.y && wR.y < nose.y;
+            if (up && !wasRaised) formStart();
+            if (up && shrug < 0.16) { formViolate(); showWarn('warnShrug', null, now); }  // 耸肩代偿违规
+            if (wasRaised && !up && wL.y > ls.y && wR.y > rs.y) award();
+            wasRaised = up;
         }
-        if (maxTilt >= 6 && now > warnUntil) showWarn('warnTilt', maxTilt.toFixed(1), now);
+        if (screenPose === 'back' && maxTilt >= 6 && now > warnUntil) showWarn('warnTilt', maxTilt.toFixed(1), now);
     }
 }
 
