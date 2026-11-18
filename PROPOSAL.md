@@ -1,379 +1,254 @@
-# SpineCare AI — Project Proposal
+# SpineCare AI: Project Proposal
 
-**Competition Submission · Phase 1 (Concept & Proof of Concept)**
+*On-Device Browser-Based Posture Screening and Form-Gated Corrective Exercise System*
 
-Repository: [github.com/cc3114/spinecare-ai-demo](https://github.com/cc3114/spinecare-ai-demo)  
-Live demo: [cc3114.github.io/spinecare-ai-demo](https://cc3114.github.io/spinecare-ai-demo/)
-
----
+| Project Resource | Reference Link / Identifier |
+| --- | --- |
+| **Source Repository** | [github.com/cc3114/spinecare-ai-demo](https://github.com/cc3114/spinecare-ai-demo) |
+| **Live Web Demonstration** | [cc3114.github.io/spinecare-ai-demo](https://cc3114.github.io/spinecare-ai-demo/) |
 
 ## 1. Executive Summary
 
-> ### *Measure your spine in 60 seconds. No hardware. No upload. No clinic visit.*
+SpineCare AI is a browser-based application that turns a standard smartphone into a posture-screening and corrective-exercise tool without requiring external hardware, cloud uploads, or clinical equipment. Using an on-device 33-landmark pose estimation model, the system evaluates shoulder tilt, forward-head posture, and forward-bend asymmetry against clinically informed thresholds, and subsequently guides users through five corrective exercises with form-gated repetition counting.
 
-**SpineCare AI turns any smartphone browser into a posture-screening and corrective-exercise coach.** It runs a 33-landmark pose model entirely on-device, grades shoulder tilt, forward head, and forward-bend asymmetry against clinical-style thresholds, then guides five corrective exercises with form-gated rep counting. Nothing is uploaded — not a single video frame.
-
-|                      |                                                                                                                                         |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **Who it serves**    | Parents screening school-age children, desk-bound knowledge workers, and home-rehab patients between clinic visits                      |
-| **Technology**       | MediaPipe Pose Landmarker (float16, 33 landmarks) via WASM/WebGL in the browser; no framework, no backend, single HTML file             |
-| **Core pain solved** | Posture problems are visible but unmeasured — professional screening is expensive, episodic, and hardware-dependent                     |
-| **Current stage**    | Working proof of concept: 3 screening poses, 5 guided exercises, photo evidence, local history, bilingual UI                            |
-| **Codebase**         | [`cc3114/spinecare-ai-demo`](https://github.com/cc3114/spinecare-ai-demo) — 1,567 lines, one `index.html`, zero dependencies to install |
-
----
+| Dimension | Specification |
+| --- | --- |
+| **Target Users** | Parents monitoring school-age children, desk-based workers, and patients performing home rehabilitation between clinical visits |
+| **Core Technology** | MediaPipe Pose Landmarker (float16, 33 landmarks) running via WASM/WebGL in the browser |
+| **Problem Addressed** | Postural deviations are often visually apparent but remain unquantified; clinical screening is costly, infrequent, and reliant on specialized facilities |
+| **Implementation Status** | Functional proof of concept supporting 3 screening poses, 5 guided exercises, annotated image capture, local history logging, and a bilingual interface |
 
 ## 2. Problem Statement
 
-### 2.1 The gap between "posture matters" and "posture is measured"
+### 2.1 The Gap Between Postural Awareness and Objective Measurement
 
-Spinal and postural problems develop slowly and silently. Adolescents with idiopathic scoliosis are typically asymptomatic until curvature is pronounced; desk workers accumulate forward-head and rounded-shoulder posture over years of screen time; post-surgical and conservative-rehab patients lose the feedback loop the moment they leave the clinic.
+Spinal and postural deviations generally progress gradually without immediate symptoms. Adolescents with idiopathic scoliosis often show few noticeable signs until spinal curvature becomes pronounced; office workers develop forward-head and rounded-shoulder alignment over years of prolonged screen use; and patients in post-surgical or conservative rehabilitation lose objective feedback once they leave the clinic.
 
-In all three cases the failure is the same: **posture is judged by feel, not by number.** A parent cannot tell whether a child's shoulders are 2° or 8° uneven. A remote worker has no idea their head has drifted 15° forward. A rehab patient performing daily exercises at home has no way to know whether their form has degraded since last week.
+In each of these groups, posture is typically evaluated through subjective self-perception rather than measurement. A parent cannot reliably distinguish between a 2° and an 8° shoulder tilt in a growing child, an office worker is rarely aware that their head posture has shifted 15° forward, and a rehabilitation patient exercising at home cannot verify whether their movement quality has deteriorated since their previous session.
 
-### 2.2 Why existing solutions fall short
+### 2.2 Limitations of Existing Approaches
 
-| Existing approach | Fatal flaw |
+| Existing Approach | Key Limitations |
 | --- | --- |
-| **Posture braces / 矫姿带** | Passive support with **no measurement at all**. It holds the body in position, creates dependency on the device, leaves the underlying muscle imbalance unaddressed, and produces zero data — the user never learns whether they improved. |
-| **Wearable sensors (IMU patches, smart clothing)** | **Expensive and shallow.** Hundreds of dollars per user, plus charging and adherence burden, and the sensing is orientation-only: a single-point IMU can see trunk inclination but cannot see shoulder asymmetry, head offset, or rib hump. |
-| **Generic reminder apps** | **No sensing whatsoever.** Timer-based nagging fires whether the user is slouched or sitting correctly, so the feedback is uncorrelated with actual posture and is ignored within weeks. |
-| **Clinic screening / X-ray** | Gold standard but **episodic and expensive**. A full-spine X-ray means a hospital visit and a radiation dose; it yields a precise number a handful of times a year and cannot be repeated weekly to tell whether anything is changing. |
-| **Offline scoliosis rehabilitation centres** | **Effective but bounded by four walls.** Sessions are high quality and therapist-supervised, yet they occupy a tiny fraction of the week: cost per session is high, travel and scheduling exclude many families, and — critically — **the feedback loop ends at the clinic door**. Between visits the patient performs exercises alone with no verification of form, no objective record, and no early warning when technique degrades. |
+| **Posture braces** | Provide passive mechanical support without measuring alignment. Prolonged use can encourage device dependency while failing to strengthen underactive postural muscles, leaving users with no objective record of progress. |
+| **Wearable sensors (IMU patches, smart garments)** | High hardware cost (often several hundred dollars per user) alongside charging and compliance burdens. Single-point inertial measurement units (IMUs) capture trunk inclination but cannot detect shoulder asymmetry, lateral head offset, or rib-hump prominence. |
+| **Timer-based reminder apps** | Lack computer-vision or sensor input. Alerts trigger on fixed schedules regardless of the user's actual posture, causing notifications to feel irrelevant and leading to rapid user drop-off. |
+| **Clinical screening and radiography** | Full-spine X-rays serve as the diagnostic gold standard, yet hospital visits, high costs, and cumulative radiation exposure restrict use to a few times per year, making weekly monitoring impractical. |
+| **Outpatient scoliosis rehabilitation clinics** | Therapist-led sessions offer high-quality supervision, but they account for only a small fraction of a patient's week. Travel demands and session fees limit access, and once patients return home, they lack real-time form verification, objective logs, or early warnings when exercise technique declines. |
 
-The common thread is not a lack of knowledge about posture — it is the **absence of a cheap, repeatable, objective measurement** at the moments that matter: at home, between visits, every week.
+Across these methods, the primary gap is the lack of an accessible, repeatable measurement tool that users can apply at home on a weekly basis between clinical appointments.
 
-### 2.3 Why now
+### 2.3 Technological Convergence
 
-Three curves crossed in the last few years:
+Three recent technical and regulatory shifts make browser-based posture screening feasible:
 
-1. **On-device vision became good enough.** Lightweight landmark models (MediaPipe Pose Landmarker, float16, ~5 MB) now run at interactive frame rates inside a mobile browser via WASM + WebGL, with no native app, no GPU server, and no per-inference cost.
-2. **The camera is already in everyone's pocket.** The marginal hardware cost of posture screening dropped to zero — no patch, no brace, no dedicated device.
-3. **Privacy expectations hardened.** Users and regulators increasingly reject health video leaving the device. On-device inference converts a compliance problem into a product feature.
+**Client-side computer vision performance:** Lightweight landmark models—such as MediaPipe Pose Landmarker (float16, approximately 5 MB)—now execute at interactive frame rates inside mobile web browsers via WebAssembly (WASM) and WebGL, eliminating the need for native app installations, server-side GPUs, or per-inference cloud costs.
 
-The result: a screening capability that previously required a clinic visit and a trained observer can now be delivered as a URL.
+**Ubiquitous camera hardware:** Because high-resolution cameras are already built into standard smartphones, the marginal hardware cost for end users is zero.
 
-### 2.4 User personas
+**Stricter health data privacy expectations:** Users and regulatory frameworks increasingly scrutinize the transmission of health-related video to external servers. Processing video frames locally removes data-transfer risks while simplifying compliance.
 
-**Persona A — The screening parent**  
-*Lin, 41, parent of a 12-year-old girl. Notices uneven shoulders in a school photo.*
+Together, these factors allow basic postural screening—previously confined to clinical settings—to be distributed directly via a standard web URL.
 
-> "The school does a visual check once a year and just says 'observe'. I don't know if it's getting worse. Booking a specialist means a weekday off, and I can't tell whether her exercises at home are actually being done correctly."
+## 3. Solution and Proof-of-Concept Demonstration
 
-Needs: a repeatable number she can compare month to month; a clear "see a doctor now" signal rather than vague reassurance; something her daughter will actually cooperate with for 60 seconds.
+### 3.1 Four-Stage Closed-Loop Workflow
 
-**Persona B — The desk-bound knowledge worker**  
-*Chen, 29, software engineer, 9+ hours a day at a laptop, recurring neck tightness.*
+The application organizes each session into a four-stage feedback loop:
 
-> "I know my head is forward. I've bought a brace, I've installed three reminder apps, none lasted two weeks. I want to see whether the numbers change, not be nagged."
+**Workflow Loop:** Measure (3 screening poses) → Grade (traffic-light risk tiers) → Correct (5 guided exercises) → Track (annotated photos + local history)
 
-Needs: passive, zero-friction check-ins; quantified progress; corrective drills short enough to actually do; zero interest in handing over body video to another app.
+Each screening session concludes with a single actionable outcome: either a green-light status paired with a maintenance drill, or an amber/red alert linked directly to the corrective exercise targeting the detected deviation.
 
----
+### 3.2 Implemented Proof-of-Concept Features
 
-## 3. Solution & PoC Demo
+All features described below are implemented and operational in the current project repository.
 
-### 3.1 Product concept: a four-stage closed loop
+#### 3.2.1 Three Screening Poses and Pose-Specific Metrics
 
-```
-MEASURE  →  GRADE  →  CORRECT  →  TRACK
-(3 poses)   (traffic      (5 guided    (photo evidence
-            light)        exercises)   + local history)
-```
+| Pose | Camera Orientation | Computed Landmark Metrics | Grading Thresholds |
+| --- | --- | --- | --- |
+| **Back view** | Full body, back facing camera | Shoulder tilt (°), pelvic tilt (°), lateral head offset (% of shoulder width) | ≥ 2.5° (amber); ≥ 6° (red) |
+| **Side view** | Profile stance, side facing camera | Forward-head angle (°), trunk lean (°), plumb-line offset (% of torso length) | Forward head: ≥ 12° / 20°; trunk lean: ≥ 10° / 15° |
+| **Forward bend** | Back facing camera, torso flexed ~90° | Bend angle (°, 3D including depth axis), back asymmetry (%), posture form check | Asymmetry: ≥ 5% (amber); ≥ 10% (red) |
 
-The design principle is **one number, one action**. Every session ends with either a green light and a maintenance drill, or an amber/red flag with the specific exercise that addresses it — never a dashboard the user has to interpret.
+Joint and segment angles are calculated as vector-to-vertical angles using the inverse cosine (acos) function, which mathematically constrains outputs to the [0°, 180°] interval and avoids the quadrant wrap-around issues associated with naive atan2 implementations.
 
-### 3.2 Verified PoC capabilities
+#### 3.2.2 Zero-Point Calibration
 
-Everything below is implemented and working in the current repository. No mock screens, no simulated conclusions presented as real.
+Minor camera tilt and individual anatomical baselines can bias raw angular measurements. Users can record a baseline calibration for any pose with a single tap; subsequent sessions display deviations relative to that baseline and evaluate changes against the same thresholds, improving the reliability of week-over-week comparisons.
 
-#### 3.2.1 Three screening poses with pose-specific metrics
+#### 3.2.3 Five Corrective Exercises with Form-Gated Repetition Counting
 
-| Pose             | Camera position           | Metrics computed from landmarks                                               | Grading thresholds             |
-| ---------------- | ------------------------- | ----------------------------------------------------------------------------- | ------------------------------ |
-| **Back view**    | Back to camera, full body | Shoulder tilt (°), pelvic tilt (°), head lateral offset (% of shoulder width) | ≥2.5° amber · ≥6° red          |
-| **Side view**    | Side-on, natural stance   | Forward-head angle (°), trunk lean (°), plumb offset (% of torso length)      | head ≥12°/20°, trunk ≥10°/15°  |
-| **Forward bend** | Back to camera, bent ~90° | Bend angle (°, 3D incl. depth axis), back asymmetry (%), form check           | asymmetry ≥5% amber · ≥10% red |
+| Exercise | Camera Stance | Automated Form Gate |
+| --- | --- | --- |
+| **Arm raise (双手托天)** | Back view | Prohibits shoulder shrugging during elevation; maintains shoulder tilt and trunk lean within limits |
+| **Shoulder release (沉肩静站)** | Back view | Monitors a static hold; upward shoulder elevation triggers an immediate correction prompt |
+| **Back extension (小燕飞)** | Side view, prone | Requires trunk lift to remain within a 20°–45° target range; hyperextension invalidates the repetition |
+| **Cat-cow (猫式伸展)** | Side view, quadruped | Tracks full phase transitions between cervical flexion (head-down) and extension (head-up) |
+| **Wall angel (靠墙天使)** | Side view, back against wall | Tracks overhead arm abduction and return; shoulder-shrugging compensation invalidates the repetition |
 
-Angles are computed as vector-to-vertical angles via `acos`, which is mathematically bounded to 0–180° — a deliberate guard against the unbounded readings that naive `atan2` implementations produce.
+A repetition is counted only when posture remains within valid thresholds throughout the entire movement cycle. If a form violation persists for 3 consecutive frames, the current repetition is invalidated and an on-screen corrective prompt appears. Keypoint visibility scores are also gated so that occluded limbs cannot trigger false completions, addressing a common limitation in unsupervised home exercise.
 
-> **📷 Screenshot to capture (PPT slide: "PoC — Screening")**  
-> The back-view screening screen with a person in frame: dark viewfinder, green skeleton overlay, the three metric values top-left of the frame (e.g. `1.3° / 0.0° / 0%`), the green grade dot top-right, the "full body in frame ✓" confirmation, and the left-hand assessment card.  
-> File already in repo: `assets/demo-screen.png`
+#### 3.2.4 Pre-Exercise Stance Guides
 
-#### 3.2.2 Zero-point calibration
+Before starting an exercise, the interface displays a full-screen setup guide specifying the required camera orientation in plain language (e.g., "Side view · back against a wall") alongside step-by-step execution instructions. This prevents setup errors—such as filming from an oblique angle—that would otherwise distort downstream angle calculations.
 
-Phone tilt and a child's natural asymmetry contaminate absolute readings. The user saves a baseline for any pose with one tap; all subsequent values are displayed as **relative change** and re-graded against the same thresholds. This is what makes week-over-week comparison meaningful rather than noisy.
+#### 3.2.5 Hands-Free Image Capture and Composite Evidence
 
-> **📷 Screenshot to capture**  
-> The screening screen immediately after tapping "⚖️ Zero-calibrate" — capture the confirmation toast and the values re-rendered as relative deltas.
+Because users cannot hold a smartphone while maintaining a full-body screening posture, the system provides two hands-free capture mechanisms: a silent 3-second visual countdown and a gesture trigger. The gesture trigger uses a lazily loaded 21-landmark hand model to recognize an "OK" sign (thumb-to-index pinch with three extended fingers) held for approximately 0.5 seconds, governed by an 8-second cooldown to prevent duplicate captures.
 
-#### 3.2.3 Five corrective exercises with form-gated rep counting
+Each captured frame is composited locally on an HTML5 canvas—combining the camera image, skeletal overlay, calculated metrics, pose label, and timestamp—and saved both to local history and as a downloadable JPEG.
 
-| Exercise                | Stance             | Automated form gate                                                       |
-| ----------------------- | ------------------ | ------------------------------------------------------------------------- |
-| Arm raise (双手托天)        | Back view          | No shrugging during the lift; tilt and trunk lean within limits           |
-| Shoulder release (沉肩静站) | Back view          | Static hold; shrug detection triggers a live correction warning           |
-| Back extension (小燕飞)    | Side, prone        | Lift must stay in the 20°–45° therapeutic window; overshoot voids the rep |
-| Cat-cow (猫式伸展)          | Side, quadruped    | Head-down → head-up phase transition detection                            |
-| Wall angel (靠墙天使)       | Side, back to wall | Arm slide overhead and return; shrugging compensation voids the rep       |
+#### 3.2.6 Local Measurement History and Summary Statistics
 
-A rep is credited **only if the form stays valid for the entire movement**. Any excursion beyond threshold for 3 consecutive frames voids that rep and surfaces an on-screen correction. Keypoint visibility is also gated, so an occluded limb cannot earn credit. This is the mechanism that separates a form coach from a motion counter — and it directly targets the home-rehab failure mode where patients "do the reps" with degrading technique.
+Measurement records are persisted in browser `localStorage` (up to 20 entries, including image thumbnails). The history view displays the total record count, most recent grade, lowest recorded grade, and a chronological log of per-session metrics linked to full composite images. If browser storage quotas are exceeded, the system falls back gracefully to storing numerical metrics without thumbnails.
 
-> **📷 Screenshot to capture (PPT slide: "PoC — Training")**  
-> The training screen mid-set, showing the rep counter badge (e.g. "2 双手托天 · 次"), the pose name and Qi points, and the left-hand "how to do it" panel with the current exercise's stance and step list.  
-> File already in repo: `assets/demo-train.png`
+#### 3.2.7 Operational Robustness
 
-#### 3.2.4 Stance guide before every exercise
+| Feature | Technical Implementation |
+| --- | --- |
+| **Full-body framing check** | Verifies visibility and bounding-box margins for the nose and both ankles, displaying live "step back" or "ready" guidance |
+| **Signal stabilization** | Applies exponential moving average (EMA) smoothing (α = 0.35) to landmark coordinates and requires 4 consecutive matching frames before updating grade states to prevent visual flicker |
+| **Camera selection** | Supports toggling between front and rear cameras with persistent preference storage |
+| **Bilingual interface** | Provides full Chinese and English localization (~96 translation keys per language) with runtime switching |
+| **Graceful fallback modes** | Switches to simulation mode if camera access is denied or model downloads fail, and supports custom model mirror URLs for restricted network environments |
+| **Camera-less demo mode** | Passing `?demo=1` in the URL routes an animated canvas figure through the live inference, overlay, and rep-gating pipeline |
 
-Selecting any exercise opens a full-screen guide that states the required camera position in plain language ("Side view · back against a wall") and lists the movement steps. This solves a real-world usability failure: users cannot be assumed to know what "side view" means, and a wrong stance silently invalidates every angle downstream.
+## 4. Technical Architecture and Design Highlights
 
-> **📷 Screenshot to capture (PPT slide: "PoC — Guidance")**  
-> The stance guide card for the wall angel: green badge "Side view · Back against a wall", the exercise title, the numbered requirement list with check marks, and the primary start button.  
-> File already in repo: `assets/demo-stance.png`
+### 4.1 System Architecture and Data Flow
 
-#### 3.2.5 Hands-free capture with evidence composite
+| Architectural Layer | Components & Responsibilities |
+| --- | --- |
+| **1. Media Acquisition (On-Device)** | HTTPS getUserMedia camera stream routed into an HTML `<video>` element as a local frame source. |
+| **2. Inference Engine (WASM + WebGL)** | MediaPipe FilesetResolver (tasks-vision 0.10.14) executing PoseLandmarker (pose_landmarker_lite, float16, GPU, 33 landmarks/frame) and lazy-loaded HandLandmarker (hand_landmarker, float16, 21 landmarks for OK-gesture capture). |
+| **3. Deterministic Analysis Layer** | EMA coordinate smoothing (α = 0.35); vector-to-vertical acos angle engine (2D and 3D depth variants); per-pose zero-point calibration; threshold grading with 4-frame debounce; and multi-condition form gate (visibility, tilt, shrug, ROM with 3-frame violation window). |
+| **4. Presentation Layer** | HTML5 skeleton canvas overlay, live metric panel with grade indicator, plain-language stance guides / correction prompts, and capture compositor (frame + skeleton + metrics + timestamp). |
+| **5. Local Storage (`localStorage`)** | Stores settings (`jp_lang`, `jp_facing`, `jp_qi`), calibration baselines (`jp_calib`), up to 20 session records with thumbnails (`jp_reports`), and optional model mirror overrides (`jp_model_url`). |
+| **External Network Boundaries** | One-time static fetch of MediaPipe WASM runtime (jsDelivr CDN) and .task model weights (model host) on first load only; zero user data egress. |
 
-Users cannot hold a phone and stand in a screenshot-worthy posture simultaneously. Two capture paths are implemented: a **3-second countdown** (with an audible-free visual countdown) and an **OK-gesture trigger** — a lazily loaded 21-landmark hand model detects thumb–index pinch plus three extended fingers, held ~0.5 s, with an 8-second cooldown against repeat firing.
+**Data-Flow Summary:** Video frames from getUserMedia pass into an HTML `<video>` element and are processed directly inside the browser thread by the MediaPipe landmark models. Joint angles, calibration offsets, and form checks are computed in client-side JavaScript, and all outputs remain in local storage. The application contains no backend API, fetch or XHR telemetry calls, analytics SDKs, or user authentication modules; external network traffic is restricted exclusively to the initial download of the MediaPipe WASM runtime and model weight files from static CDNs.
 
-The captured image is composited in-canvas: camera frame + skeleton overlay + metric values + pose name + timestamp, then offered as a downloadable JPEG and archived automatically.
-
-> **📷 Screenshot to capture**  
-> The post-capture full-screen photo overlay showing the composite image with skeleton and metrics burned in, plus the "Save image / Back to live view" bar. A short GIF of the OK-gesture → 3-2-1 → capture sequence is strongly recommended for the live pitch.
-
+### 4.2 Key Engineering Decisions
 
-#### 3.2.6 Local measurement history and grade statistics
+**Privacy by architectural constraint:** Rather than relying on server-side data-retention policies, the system removes external data transmission paths entirely—a property verifiable directly in the 1,567-line single-file source code. Eliminating backend servers also removes recurring GPU inference and bandwidth expenses.
 
-Every capture is stored in `localStorage` (capped at 20 entries, thumbnails included). The report view shows record count, latest grade, worst grade, and a chronological list with per-record metrics that opens to the full composite image. Storage-quota overflow degrades gracefully to metrics-only records.
+**Deterministic, auditable biomechanical calculations:** Every displayed angle maps to a named pair of anatomical landmarks, an explicit acos vector-to-vertical formula, and a documented threshold. In the forward-bend assessment, calculations incorporate the depth (z) coordinate because spinal flexion occurs primarily along the anterior-posterior plane rather than laterally. This ensures all outputs are reproducible and transparent.
 
-> **📷 Screenshot to capture**  
-> The "My Report" screen with 3–4 archived records showing different grade colours, plus the three summary statistics at the top.
+**Multi-condition form gating:** To distinguish therapeutic movement from unguided motion, repetition credit requires simultaneous satisfaction of keypoint visibility, tilt bounds, shoulder-shrug limits, and range-of-motion windows (such as the 20°–45° zone for back extensions). Requiring violations to persist across 3 consecutive frames filters out single-frame landmark jitter while capturing sustained postural compensation. Thresholds are also conditioned on camera view—for example, shoulder tilt is omitted in side-view exercises where left and right landmarks overlap.
 
-#### 3.2.7 Operational robustness
+**Low-friction user workflow:** Long-term adherence is often the primary bottleneck in home exercise programs. Delivering the tool as a zero-install web link with no login requirement, pre-exercise stance instructions, hands-free OK-gesture capture, and a 20-session visual log reduces setup friction. Additionally, the `?demo=1` query parameter allows full pipeline demonstrations without a live camera or human subject.
 
-| Capability                  | Implementation                                                                                                            |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| **Full-body framing check** | Nose and both ankles tested for visibility and frame bounds; live "step back" / "✓ ready" prompt                          |
-| **Signal stabilization**    | Exponential smoothing (α = 0.35) on all landmarks; grade changes require 4 consecutive agreeing frames to prevent flicker |
-| **Camera switching**        | Front/rear toggle, persisted                                                                                              |
-| **Bilingual UI**            | Complete Chinese/English interface, ~96 keys per locale, switchable at runtime                                            |
-| **Graceful degradation**    | Simulation mode on camera denial or model-download failure; custom model mirror URL for restricted networks               |
-| **Camera-less demo mode**   | `?demo=1` feeds a canvas-animated figure through the real inference pipeline — identical overlay, metrics, and rep gating |
+**Bounded angular arithmetic and unit testing:** Angular pipelines are prone to edge-case overflow and unit mismatches. Using a vector-angle formulation strictly bounded to [0°, 180°] and validating outputs against synthetic geometric test cases (0.0° upright, 20° lean, 45° and 90° flexion) helped identify and resolve a double degree-conversion defect and an inverted shrug-distance check during development.
 
----
+## 5. Competitive Analysis
 
-## 4. Technical Architecture & Innovation
+### 5.1 Feature and Capability Comparison
 
-### 4.1 System architecture and data flow
-
-```mermaid
-flowchart TB
-    subgraph Device["User Device — 100% on-device"]
-        CAM["Camera stream<br/>(getUserMedia, HTTPS)"]
-        VID["&lt;video&gt; element<br/>frame source"]
-
-        subgraph Engine["Inference Engine (WASM + WebGL)"]
-            RES["MediaPipe FilesetResolver<br/>tasks-vision 0.10.14"]
-            POSE["PoseLandmarker<br/>pose_landmarker_lite · float16 · GPU<br/>33 landmarks / frame"]
-            HAND["HandLandmarker<br/>hand_landmarker · float16<br/>21 landmarks — lazy, gesture only"]
-        end
-
-        subgraph Logic["Deterministic Analysis Layer"]
-            EMA["EMA smoothing<br/>α = 0.35"]
-            ANG["Angle engine<br/>vector-to-vertical acos<br/>2D + 3D (depth) variants"]
-            CAL["Zero-point calibration<br/>per-pose baselines"]
-            GRADE["Grading<br/>pose-specific thresholds<br/>+ 4-frame debounce"]
-            FORM["Form gate<br/>visibility · tilt · shrug · ROM<br/>3-frame violation window"]
-        end
-
-        subgraph UI["Presentation Layer"]
-            OVL["Skeleton canvas overlay"]
-            PANEL["Live metric panel + grade dot"]
-            GUIDE["Stance guides / correction prompts"]
-            SHOT["Capture compositor<br/>frame + skeleton + metrics + timestamp"]
-        end
-
-        subgraph Store["Local Persistence — localStorage only"]
-            S1["jp_lang · jp_facing · jp_qi"]
-            S2["jp_calib — calibration baselines"]
-            S3["jp_reports — max 20 records + thumbnails"]
-            S4["jp_model_url — mirror override"]
-        end
-
-        CAM --> VID --> POSE
-        VID --> HAND
-        RES --> POSE
-        RES --> HAND
-        POSE --> EMA --> ANG --> CAL --> GRADE --> PANEL
-        GRADE --> OVL
-        EMA --> OVL
-        ANG --> FORM --> GUIDE
-        SHOT --> S3
-        PANEL --> SHOT
-        OVL --> SHOT
-        GRADE --> S2
-        Store --> UI
-    end
-
-    CDN["jsDelivr CDN<br/>runtime + WASM (first load only)"] -.-> RES
-    GCS["Model host<br/>pose / hand .task (first load only)"] -.-> POSE
-    GCS -.-> HAND
-
-    USER["User / phone browser"] --> CAM
-    SHOT --> DL["Local JPEG download"]
-
-    FUTURE["Planned (Phase 2+, not implemented)<br/>optional encrypted sync · clinician dashboard"]:::future
-    S3 -.-> FUTURE
-
-    classDef future fill:#f6f6f6,stroke:#bbb,stroke-dasharray:4 4,color:#777
-```
-
-**Data-flow statement for judges:** the camera stream enters a `<video>` element, frames are consumed by the landmark model in the same browser process, angles are derived in plain JavaScript, and results are rendered and stored locally. **No `fetch`, no XHR, no backend, no analytics SDK, no account.** The only outbound requests in the entire application are the one-time CDN fetch of the MediaPipe runtime and model weights.
-
-### 4.2 Innovation highlights
-
-**① On-device inference as a privacy architecture, not a checkbox.**  
-The product has no server to breach and no video to retain. This is not a policy promise — it is the physical absence of a transmission path, verifiable by reading a 1,567-line single file. For a product that asks parents to point a camera at their child's back, this is the difference between a viable product and a non-starter. It also collapses marginal cost to zero: no GPU inference bill, no bandwidth bill, no per-scan pricing pressure.
-
-**② Deterministic, auditable biomechanics instead of a generative black box.**  
-Every number on screen traces to a named landmark pair, a vector-to-vertical `acos` computation, and a published threshold. The forward-bend angle deliberately incorporates the depth (z) axis because spinal flexion manifests primarily as depth folding, not lateral displacement. When a judge or a clinician asks "why 6°?", the answer is a line of code, not a model's opinion. This is the opposite of an LLM wrapper: reproducible, explainable, and identical on every run.
-
-**③ Form gating — the part that actually changes outcomes.**  
-Motion counters reward movement; rehabilitation requires *correct* movement. The app gates credit on a composite validity check: keypoint visibility, pose-specific tilt limits, shrug compensation, and range-of-motion windows (e.g. back extension must stay within 20°–45°). Violations persist for 3 frames before voiding a rep, which filters sensor jitter while still catching genuine compensation. The thresholds are also stance-aware — shoulder tilt is not evaluated in side view because both shoulders overlap in that projection and the measurement would be meaningless.
-
-**④ Friction engineering: the product is designed to survive week three.**  
-Adherence, not accuracy, is the binding constraint on home posture programs. Concretely: zero install (a URL), zero login, one-tap capture, hands-free OK-gesture triggering so the user can stand correctly and still take the photo, a stance guide before every exercise to prevent silent setup errors, and a 20-record history that makes progress visible. The `?demo=1` mode additionally lets the product be demonstrated — to a clinician, an employer, or a judge — with no camera and no subject present.
-
-**⑤ Bounded-math discipline as an engineering value.**  
-Angle pipelines are a classic source of silent, catastrophic error. The current implementation uses a vector-angle formulation whose codomain is provably 0–180°, uses unit-consistent radian/degree handling, and has been unit-tested against known geometric configurations (upright 0.0°, 20° lean, 45°/90° flexion). During development this discipline caught and eliminated a double degree-conversion bug that had produced readings in the hundreds of degrees, and an inverted shrug-distance formula that would have permanently blocked rep credit for every real user.
-
----
-
-## 5. Competitive Advantage
-
-### 5.1 Comparison matrix
-
-| Dimension | **SpineCare AI** | Posture brace | Wearable sensor | Generic health app | Clinic / X-ray | Offline scoliosis rehab centre |
+| Criterion | SpineCare AI | Posture Brace | Wearable Sensor | Generic App | Hospital / X-Ray | Outpatient Rehab Clinic |
 | --- | --- | --- | --- | --- | --- | --- |
-| **Cost to the user** | **¥0** — existing phone | ¥100–300, replaced as the child grows | ¥500–2,000 + charging | ¥0 | ¥300–800 per visit + radiation | ¥200–600 per session, 2–3× weekly |
-| **Measurement basis** | 33 landmarks → angular metrics | None (passive support) | Orientation only (single-point) | None (timer-based) | Radiographic Cobb angle | Therapist visual/ palpation assessment |
-| **What it can actually see** | Shoulder/pelvic tilt, forward head, trunk lean, forward-bend asymmetry | Nothing | Trunk inclination | Nothing | Full spinal geometry | Whole-body movement quality, expert read |
-| **Real-time feedback** | Yes — per-frame, with correction prompts | No | Vibration alert only | Reminder only | No (result arrives after the visit) | Yes, but only inside the session |
-| **Form verification** | **Yes** — rep credited only if form is valid | N/A | No | No | Clinician observation, in-clinic only | **Best in class, therapist-supervised** |
-| **Personalized intervention** | Yes — pose-specific thresholds + 5 matched exercises | Generic | Generic | Generic | Yes, but clinic-bound | **Yes — individualised programme, highest quality** |
-| **Continuity between sessions** | **Yes** — every session logged, trend visible | No | App-dependent, cloud-stored | Minimal | Only at visit intervals | **None — the loop ends at the clinic door** |
-| **Longitudinal tracking** | Yes — photo + metrics, up to 20 records on-device | No | Partly, cloud-stored | Minimal | Yes, at visit intervals | Therapist notes; adherence unverified |
-| **Accessibility / travel** | Anywhere with a phone | Anywhere | Anywhere, with wear burden | Anywhere | Hospital appointment required | Fixed location, weekday slots, travel cost |
-| **Privacy** | **Video never leaves the device** | N/A | Varies; often cloud-synced | Often cloud-synced | Hospital records | Clinical records held by provider |
-| **Installation / onboarding** | Open a URL, 60 seconds | Wear daily | Pair, charge, calibrate | Sign-up + permissions | Book appointment, wait for slot | Referral, intake assessment, scheduled visits |
-| **Regulatory posture** | Wellness / screening aid | Consumer device | Varies | Wellness | Medical device | Licensed clinical service |
-| **Screening frequency** | Unlimited, free | N/A | Continuous but shallow | N/A | 1–2× per year at best | 2–3× per week, only while enrolled |
+| **User cost** | ¥0 (existing phone) | ¥100–300 (replaced with growth) | ¥500–2,000 + charging | ¥0 | ¥300–800/visit + radiation | ¥200–600/session (2–3×/wk) |
+| **Measurement** | 33 landmarks → joint angles | None (passive support) | Single-point IMU orientation | None (timer alerts) | Radiographic Cobb angle | Therapist visual & manual exam |
+| **Detectable features** | Shoulder/pelvic tilt, forward head, trunk lean, bend asymmetry | None | Trunk inclination only | None | Full skeletal spinal geometry | Whole-body movement & palpation |
+| **Real-time feedback** | Per-frame metrics + correction prompts | None | Vibration cues only | Scheduled reminders only | Post-visit report | Live verbal & tactile cues |
+| **Form verification** | Automated form-gated rep counting | N/A | None | None | In-clinic only | Direct therapist supervision |
+| **Intervention specificity** | Pose thresholds mapped to 5 exercises | Generic | Generic | Generic | In-hospital consultation | Individualized protocol |
+| **Between-visit continuity** | Home session logs & trend tracking | None | Cloud app-dependent | Minimal | Follow-up visits only | Ends upon leaving clinic |
+| **Longitudinal records** | Up to 20 on-device composite photos | None | Partial (cloud-stored) | Minimal | Periodic hospital imaging | Session notes; home unverified |
+| **Accessibility** | Any location with smartphone | Any location | Any location (wear burden) | Any location | Hospital appointment | Clinic travel & fixed slots |
+| **Data privacy** | 100% on-device processing & storage | N/A | Often vendor cloud-synced | Often vendor cloud-synced | Hospital EMR | Provider clinical records |
+| **Onboarding** | Web URL (~60 seconds) | Daily physical wear | Pair, charge & calibrate | Account sign-up | Scheduling & wait times | Referral & clinical intake |
+| **Regulatory category** | General wellness & screening aid | Consumer support product | Varies by device | General wellness | Regulated medical device | Licensed clinical service |
+| **Practical frequency** | Unlimited | N/A | Continuous (trunk only) | N/A | 1–2× per year | 2–3×/week while enrolled |
 
-### 5.2 Reading the offline rehab centre column honestly
+### 5.2 Relationship to Outpatient Rehabilitation Clinics
 
-Offline scoliosis rehabilitation centres are the **strongest clinical competitor** in this matrix, and the proposal does not pretend otherwise: a trained therapist beats any camera on assessment quality, hands-on correction, and programme design. Three of the thirteen dimensions are won outright by the centre — form verification at expert level, individualised intervention quality, and regulatory standing.
+Outpatient scoliosis rehabilitation centers represent the highest standard of hands-on care in this comparison, outperforming camera-based tools in diagnostic precision, manual correction, and individualized program design. However, clinic-based care is inherently constrained by time: a patient attending three one-hour sessions per week spends roughly 3 hours under clinical supervision and 165 hours at home without objective feedback or form monitoring.
 
-But the column exposes a structural weakness that no amount of clinical skill can fix: **the centre owns the session, not the week.** A patient attending three sessions weekly spends roughly 3 hours under supervision and 165 hours unsupervised. During those 165 hours there is no measurement, no form check, and no record — and this is precisely where home programmes fail, silently and invisibly.
+Rather than competing with physical therapists, SpineCare AI is designed to bridge this 165-hour gap by giving patients a structured, 60-second check-in tool that tracks the same postural metrics emphasized in clinic. This complementary relationship also underpins the clinic-adjacent follow-up model outlined in Section 6.
 
-That gap defines the product's role. SpineCare AI is **not positioned to replace the rehab centre; it is positioned to extend it into the 165 hours**, with the same three metrics the therapist cares about, captured in 60 seconds, on a device the family already owns. The commercially interesting consequence is that the two are complements rather than substitutes — which is exactly why "clinic-adjacent follow-up" appears as a revenue track in Section 6, sold to the centre rather than against it.
+### 5.3 Positioning and Technical Limitations
 
-### 5.3 Positioning
+**Core positioning:** SpineCare AI addresses the monitoring gap during the intervals between annual check-ups and weekly therapy sessions, combining zero marginal hardware cost, quantitative angular tracking, and local data privacy.
 
-**Positioning statement:** SpineCare AI does not compete with X-ray or with a therapist's hands — it competes with *not measuring at all* in the 360 days between visits, and with the 165 unsupervised hours in every week of rehabilitation. It occupies the empty quadrant of **zero hardware cost × real angular measurement × on-device privacy**.
+**Acknowledged technical limitation:** Because standard smartphone cameras capture monocular RGB video without dedicated depth sensors, forward-bend asymmetry is estimated from 2D landmark displacement and the pose model's predicted z-coordinate rather than true 3D surface topography. Consequently, the application functions as a screening and adherence aid rather than a substitute for radiographic Cobb-angle measurement, a limitation stated explicitly on screen.
 
-**Honest limitation, stated up front:** a monocular RGB camera has no depth sensor. Rib-hump asymmetry in the forward-bend pose is inferred from landmark displacement (including the model's z estimate), not from true surface topography. The app is therefore a *screening and adherence tool*, not a Cobb-angle substitute — and it says so on screen.
+## 6. Feasibility and Deployment Strategy
 
----
+### 6.1 Technical and Operational Feasibility
 
-## 6. Feasibility & Business Model
+**Minimal hosting overhead:** Because inference runs entirely on the client device, the application can be served from static web hosting with near-zero marginal compute cost per session.
 
-### 6.1 Why this is buildable now
+**Cross-platform browser distribution:** Deploying via a standard URL bypasses app-store approval cycles, supports both iOS and Android browsers immediately, and allows distribution via messaging apps, school notices, or workplace portals.
 
-- **Zero infrastructure cost at rest.** Static hosting serves the entire product; inference cost per user per session is ¥0. Gross margin is not "high" — it is structurally near-100% on the delivery side.
-- **No app-store gatekeeping.** A URL works on iOS and Android today, updates instantly, and can be embedded in a WeChat message, a school notice, or an employer portal.
-- **The core is already validated.** Three screening poses, five exercises, form gating, capture, and history are implemented and demonstrable — the remaining work is productization, not invention.
-- **Known engineering backlog, not unknown research risk.** See Roadmap; every Phase 2 item is a scoped engineering task.
+**Validated core pipeline:** All primary screening, calibration, form-gating, and local storage modules are already implemented in the prototype, shifting remaining effort from algorithmic exploration to product refinement.
 
-### 6.2 Go-to-market
+### 6.2 Potential Deployment Tracks
 
-**Track A — Consumer freemium (primary, lowest friction)**
+**Track A — Consumer Freemium:** All 3 screening poses, risk grading, 3 corrective exercise modules, and 20-record local history (¥0); Plus tier adds full exercise library, PDF/CSV report export, multiple family profiles, extended longitudinal charts, and optional encrypted cloud backup (¥19–29/month or ¥128–198/year).
 
+| Tier | Included Features | Proposed Pricing |
+| --- | --- | --- |
+| **Free** | All 3 screening poses, risk grading, 3 corrective exercise modules, and 20-record local history | ¥0 |
+| **Plus** | Full exercise library, PDF/CSV report export, multiple family profiles, extended longitudinal charts, and optional encrypted cloud backup | ¥19–29/month or ¥128–198/year |
 
-| Tier     | Contents                                                                                                                                    | Price hypothesis                  |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| **Free** | All three screening poses, grade result, 3 exercise modules, 20-record local history                                                        | ¥0                                |
-| **Plus** | Full exercise library, PDF/CSV progress export, multi-profile (siblings / family), long-horizon trend view, optional encrypted cloud backup | ¥19–29 / month or ¥128–198 / year |
+**Track B — Workplace Musculoskeletal Wellness (B2B):** Employers and insurers seeking to reduce musculoskeletal complaints can license an annual per-seat check-in module with anonymized, aggregate participation metrics. On-device video processing simplifies corporate IT and privacy reviews because no employee images enter employer servers.
 
-Conversion lever: the free tier always answers "is it getting worse?" — the paid tier answers "show me the trend over 6 months and hand it to my doctor."
+**Track C — Clinic-Adjacent Patient Follow-Up:** Orthopedic and rehabilitation clinics can adopt a white-labeled version that generates exportable home-exercise adherence and posture logs, extending clinician visibility between appointments.
 
-**Track B — B2B employee wellness (EAP)**  
-Employers and insurers already buy musculoskeletal-disease prevention because MSD is a leading driver of claims and lost days. Selling a per-seat annual licence (health check-in module + aggregate, anonymized participation reporting) requires no consumer acquisition cost. The on-device architecture is the decisive selling point for HR and legal review: no employee video or health data enters the employer's systems.
+**Track D — School Screening Pilots (Long-Term):** In regions conducting routine school scoliosis checks, a teacher-supervised 60-second browser screening could standardize initial triage and reduce false-positive specialist referrals, subject to institutional approval and ethical review.
 
-**Track C — Clinic-adjacent follow-up**  
-Orthopedic and rehabilitation practices lose visibility between visits. A white-labelled version — practice-branded, patient-scoped, with an exportable adherence and measurement log — extends the clinic's care into the home without requiring the clinic to build software. Sold as a per-practice subscription; positioned explicitly as an *adjunct to* clinical care, never a replacement.
+### 6.3 Compliance and Scope Boundaries
 
-**Track D — School screening programs (optional, highest reach)**  
-School-based scoliosis screening is mandated or customary in many regions but is performed visually. A URL-based, teacher-supervised 60-second check with a "refer to specialist" flag could materially improve referral precision. This track requires institutional sales and careful ethical framing; it is a Phase 3 candidate, not a Phase 1 claim.
+SpineCare AI is designed strictly as a general wellness and posture-management aid. It is not a medical device, does not output clinical diagnoses or Cobb-angle measurements, and does not replace physical examination or medical imaging.
 
-### 6.3 Compliance and risk boundaries
+User-facing feedback is restricted to non-diagnostic screening advisories ("within normal range," "worth observing," and "consider seeing a specialist"), accompanied by a persistent disclaimer recommending consultation with an orthopedic specialist and a full-spine radiograph for definitive clinical evaluation. All measurements and images remain inside the user's browser `localStorage` and can be deleted at any time; any future cloud synchronization will require explicit opt-in consent and end-to-end encryption.
 
-SpineCare AI is positioned as a **daily posture-management and health-assistance tool**. It is **not a medical device**, does not perform diagnosis, does not measure Cobb angle, and does not replace clinical examination or imaging.
+## 7. Development Roadmap
 
-The product will not output diagnostic labels, will not recommend treatment, and will not stratify patients into clinical categories. Its on-screen language is limited to screening-style advisories ("within normal range", "worth observing", "consider seeing a specialist"). Every result screen carries a persistent disclaimer directing users to an orthopedic specialist and a full-spine X-ray for definitive evaluation. Data protection obligations are minimized by architecture: measurements and images are stored only in the user's own browser `localStorage`, are never transmitted, and can be cleared by the user at any time. Any future cloud feature will be opt-in, encrypted, and separately consented. Where local regulation treats posture analysis as a regulated medical function, the product scope will be narrowed to fitness/wellness framing rather than expanded.
+### Phase 1: Proof-of-Concept Prototype (Completed)
 
----
+- In-browser 33-landmark pose estimation (float16, GPU delegate via WASM).
+- Three screening poses (back, side, and forward bend) with pose-specific thresholds.
+- Bounded 2D and 3D vector-angle engine verified against known geometric baselines.
+- Per-pose zero-point calibration to account for camera tilt and baseline asymmetry.
+- Live full-body framing checks and stance prompts.
+- Five corrective exercises with plain-language setup guides, form-gated repetition counting, and correction alerts.
+- Hands-free image capture via a 3-second countdown or lazily loaded 21-landmark OK-gesture recognition.
+- Local composite JPEG generation and a 20-record `localStorage` history log.
+- Bilingual Chinese/English interface with camera toggling, simulation fallback, and `?demo=1` mode.
 
-## 7. Roadmap
+### Phase 2: Productization and Cross-Device Refinement (Months 1–3)
 
-### Phase 1 — MVP proof of concept ✅ *current stage*
+- Progressive Web App (PWA) packaging with a service worker for offline runtime and model caching.
+- Multi-profile support to separate calibration baselines and histories for multiple family members.
+- Longitudinal trend charts per metric and pose, paired with PDF/CSV export for clinical visits.
+- Multi-week structured exercise progressions rather than standalone drills.
+- Threshold validation against a labeled posture dataset to quantify sensitivity and specificity relative to clinician ratings.
+- Adaptive frame-rate scaling for lower-end smartphones, reduced-motion accessibility options, and optional audio cues.
 
-Shipped, running, and demonstrable today:
+### Phase 3: Ecosystem Integration and Institutional Pilots (Months 6–12)
 
-- **On-device pose inference** — 33 landmarks, float16 model, GPU delegate, in-browser via WASM.
-- **Three screening poses** — back, side, and forward-bend, each with its own metrics and clinical-style thresholds.
-- **Bounded vector-angle engine** — 2D and 3D (depth-aware) variants, unit-tested against known geometries.
-- **Per-pose zero-point calibration** — relative-value display that cancels phone tilt and natural asymmetry.
-- **Framing and stance coaching** — full-body check plus pose-specific live prompts.
-- **Five corrective exercises** — form-gated rep counting, stance guides in plain language, on-screen correction warnings.
-- **Hands-free capture** — 3-second countdown and OK-gesture trigger via a lazily loaded 21-landmark hand model.
-- **Evidence composite** — skeleton, metrics, and timestamp burned into a downloadable JPEG.
-- **Local history** — 20 records with thumbnails, latest/worst grade statistics, full-image review.
-- **Bilingual interface** — complete Chinese/English UI, camera switching, simulation and demo fallbacks.
+- Optional, consent-gated encrypted cloud backup.
+- Read-only clinician review dashboard for patient-shared adherence and trend reports.
+- Pilot deployments with 1–2 rehabilitation clinics to evaluate home-exercise adherence and measurement consistency.
+- Pilot integration with an employer wellness program using anonymized aggregate participation metrics.
+- Expanded exercise library featuring beginner regressions and advanced progressions.
+- Optional auto-generated longitudinal trend summaries, clearly labeled as non-diagnostic.
+- Formal regulatory review in target markets to ensure ongoing alignment with wellness-tool classifications.
 
-### Phase 2 — Productization and multi-device polish *(1–3 months)*
+## 8. Appendix: Verifiable Implementation Index
 
-- **True PWA** — web app manifest plus service-worker caching so the runtime and models load offline.
-- **Multi-profile support** — separate baselines and histories for each family member.
-- **Trend visualization** — per-metric, per-pose longitudinal charts, with PDF/CSV export for clinical conversations.
-- **Structured programmes** — multi-week corrective plans instead of standalone exercises.
-- **Evidence-based thresholds** — tune cut-offs against a labelled capture set and publish sensitivity/specificity versus clinician assessment.
-- **Performance and accessibility** — frame-rate adaptation for low-end devices, reduced-motion mode, optional audible cues.
+| Proposal Claim | Codebase Verification Location |
+| --- | --- |
+| **33-landmark float16 pose model with GPU delegate** | `index.html` — PoseLandmarker.createFromOptions |
+| **Lazy-loaded 21-landmark hand model for gesture capture** | `index.html` — gesture toggle handler |
+| **Pose-specific metrics and grading thresholds** | `index.html` — POSES configuration object |
+| **Bounded vector-angle calculations (acos, 0–180°)** | `index.html` — angleUp and angleUp3 functions |
+| **EMA smoothing (α = 0.35) and 4-frame grade debounce** | `index.html` — draw() render loop |
+| **Multi-condition form gating with 3-frame violation window** | `index.html` — training block inside draw() |
+| **20-record local measurement history** | `index.html` — addRecord() function |
+| **Zero external transmission of user video or metrics** | Repository-wide (no fetch, XHR, or analytics calls; outbound traffic limited to CDN runtime/model URLs) |
 
-### Phase 3 — Ecosystem and institutional pilots *(6–12 months)*
-
-- **Encrypted cloud backup** — opt-in, consent-gated, never required for core function.
-- **Clinician review dashboard** — read-only, patient-shared adherence and trend view.
-- **Clinic pilot** — 1–2 rehabilitation practices, measuring adherence lift and measurement consistency.
-- **Employer EAP pilot** — anonymized aggregate participation reporting only.
-- **Exercise library expansion** — progression and regression variants per movement.
-- **Narrative trend summaries** — optional generated text over the user's own data, clearly labelled as generated and never as diagnosis.
-- **Regulatory review** — confirm wellness positioning in target markets before any clinical claim is considered.
-
----
-
-## Appendix — Verifiable claims index
-
-| Claim in this proposal                                        | Where to verify                                                                      |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| 33-landmark pose model, float16, GPU delegate                 | `index.html` — `PoseLandmarker.createFromOptions`                                    |
-| 21-landmark hand model, lazy-loaded for gestures              | `index.html` — gesture toggle handler                                                |
-| Pose-specific metrics and thresholds                          | `index.html` — `POSES` configuration                                                 |
-| Bounded angle math (`acos`, 0–180°)                           | `index.html` — `angleUp` / `angleUp3`                                                |
-| EMA smoothing α = 0.35, 4-frame grade debounce                | `index.html` — `draw()`                                                              |
-| Form gating (visibility / tilt / shrug / ROM, 3-frame window) | `index.html` — training block in `draw()`                                            |
-| 20-record local history                                       | `index.html` — `addRecord()`                                                         |
-| No network transmission of user data                          | Repository-wide: no `fetch` / XHR / analytics calls; only CDN runtime and model URLs |
-
----
-
-*SpineCare AI is a family screening and posture-management aid. It is not a medical device and does not provide diagnosis. For definitive evaluation, consult an orthopedic specialist and obtain a full-spine X-ray.*
+**Medical Disclaimer:** SpineCare AI is a personal posture-management and screening aid; it is not a medical device and does not provide medical diagnoses. For definitive clinical evaluation, consult an orthopedic specialist and obtain a full-spine radiograph.
