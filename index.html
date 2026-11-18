@@ -300,7 +300,7 @@
     <div class="topbar">
         <div class="tb-left">
             <span class="tb-back" onclick="showHome()">‹</span>
-            <div class="brand"><span id="brand-name">脊正 · 真机版</span><small>SPINECARE AI · V12</small></div>
+            <div class="brand"><span id="brand-name">脊正 · 真机版</span><small>SPINECARE AI · V13</small></div>
         </div>
         <div class="top-right">
             <div class="qi"><span data-i18n="qiLabel">正气值</span> <b id="qi">0</b></div>
@@ -456,6 +456,7 @@ let mode = 'screen';                 // screen | train
 let screenPose = 'back';             // back | side | bend
 let exMode = 1;                      // 1 托天 | 2 沉站 | 3 小燕飞 | 4 猫式 | 5 靠墙天使
 let reps = 0, wasRaised = false, wasLifted = false, catPhase = 'none', qi = +(localStorage.getItem('jp_qi') || 0);
+let formOk = true, formBadCnt = 0;   // 跟练动作合规标记：起势重置，全程违规连续 3 帧判不标准，不计次
 let warnUntil = 0;
 let smooth = null;                   // 骨骼点指数平滑缓存（抑制逐帧抖动）
 let curGrade = null, pendingGrade = null, pendingCount = 0;  // 分级防抖
@@ -546,7 +547,8 @@ const I18N = {
         warnShrug2: '⚠️ 检测到耸肩！请沉肩坠肘，配合深呼吸',
         warnTilt: '⚠️ 身体歪斜 {v}°，请回正再继续',
         warnLift: '⚠️ 抬起过高！用上背部发力即可，保护腰椎',
-        warnWall: '⚠️ 手腕离开墙面！请让手臂贴墙滑动'
+        warnWall: '⚠️ 手腕离开墙面！请让手臂贴墙滑动',
+        warnForm: '⚠️ 动作不标准，本次不计入计数'
     },
     en: {
         brand: 'SpineCare · Live Demo',
@@ -622,7 +624,8 @@ const I18N = {
         warnShrug2: '⚠️ Shoulders raised! Drop them and breathe slowly',
         warnTilt: '⚠️ Body tilted {v}° — straighten up',
         warnLift: '⚠️ Too high — use your upper back and protect the lumbar spine',
-        warnWall: '⚠️ Wrists off the wall — slide along the wall'
+        warnWall: '⚠️ Wrists off the wall — slide along the wall',
+        warnForm: '⚠️ Form not standard — this rep does not count'
     }
 };
 const t = k => (I18N[curLang][k] !== undefined ? I18N[curLang][k] : k);
@@ -911,6 +914,7 @@ window.pickEx = function (n) {
     $('rep').style.display = (n !== 2 && !usingSim) ? 'block' : 'none';
     $('rep-label').innerText = n === 2 ? '' : t('rep' + n);
     reps = 0; $('rep-num').innerText = 0;
+    formOk = true; formBadCnt = 0; wasRaised = false; wasLifted = false; catPhase = 'none';
 };
 
 /* ---------- 拍照：合成「画面 + 骨骼 + 实时数据」→ 取景框内展示 + 存入报告 ---------- */
@@ -1302,44 +1306,62 @@ function draw(res) {
         ['g', 'y', 'r'].forEach(k => $('lv-' + k).classList.toggle('on', k === gc));
     }
 
-    /* ---- 跟练逻辑（五个动作） ---- */
+    /* ---- 跟练逻辑（五个动作）：动作全程各项指标达标才计次 ---- */
     if (mode === 'train') {
         const now = Date.now();
+        if (usingSim) return;                 // 模拟模式不出假数据
         const earL = lm[7], earR = lm[8];
         const wL = lm[15], wR = lm[16];
         const shrug = Math.min((earL.y - ls.y), (earR.y - rs.y)) / shW;
+        const visOk = (ls.visibility ?? 1) > 0.5 && (rs.visibility ?? 1) > 0.5 &&
+                      (wL.visibility ?? 1) > 0.4 && (wR.visibility ?? 1) > 0.4;
+        const leanDeg = v.angleUp(hpM, shM) * 180 / Math.PI;   // 躯干倾角
+
+        /* 计次门槛：起势时重置合规标记；任一指标越界连续 3 帧即判动作不标准 */
+        const formStart = () => { formOk = true; formBadCnt = 0; };
+        const formViolate = () => { if (++formBadCnt >= 3) formOk = false; };
+        if (!visOk || maxTilt >= 2.5 || leanDeg >= 10) formViolate(); else formBadCnt = 0;
+
         const award = () => {
+            if (!formOk) { showWarn('warnForm', null, now); return; }   // 不标准不计次
             reps++; $('rep-num').innerText = reps;
             qi += 5; localStorage.setItem('jp_qi', qi); $('qi').innerText = qi;
         };
-        if (exMode === 1) {                       // 双手托天：手腕过鼻尖
+        if (exMode === 1) {                       // 双手托天：手腕过鼻尖 → 沉肩保持 → 落下
             const raised = wL.y < nose.y && wR.y < nose.y;
-            if (wasRaised && !raised) award();    // 完成一次「起-落」
+            if (raised && !wasRaised) formStart();
+            if (raised && shrug < 0.16) { formViolate(); showWarn('warnShrug', null, now); }
+            if (wasRaised && !raised) award();    // 完成一次「起-落」，且全程合规
             wasRaised = raised;
-            if (raised && shrug < 0.16) showWarn('warnShrug', null, now);
         }
-        if (exMode === 2) {                       // 沉肩静站：耸肩检测
+        if (exMode === 2) {                       // 沉肩静站：耸肩检测（不计次）
             if (shrug < 0.14) showWarn('warnShrug2', null, now);
         }
-        if (exMode === 3) {                       // 小燕飞：俯卧（侧对镜头），躯干抬起角度
+        if (exMode === 3) {                       // 小燕飞：俯卧（侧对镜头），躯干抬起 20°~45°
             const a = Math.atan2(Math.abs(shM.y - hpM.y), Math.abs(shM.x - hpM.x)) * 180 / Math.PI;
             const lifted = a >= 20;
+            if (lifted && !wasLifted) formStart();
+            if (lifted && a > 45) { formViolate(); showWarn('warnLift', null, now); }
             if (wasLifted && !lifted && a < 10) award();
             wasLifted = lifted;
-            if (a > 45) showWarn('warnLift', null, now);
         }
         if (exMode === 4) {                       // 猫式伸展：跪姿，低头→抬头一个来回
             const e = (earM.y - shM.y) / torsoLen; // 正=耳接近肩线(低头), 负=耳远高于肩(抬头)
-            if (e > -0.06) catPhase = 'down';
+            if (e > -0.06) {
+                if (catPhase !== 'down') formStart();
+                catPhase = 'down';
+            }
             else if (e < -0.22 && catPhase === 'down') { award(); catPhase = 'none'; }
         }
-        if (exMode === 5) {                       // 靠墙天使：手臂上滑过头回落 + 离墙检测
+        if (exMode === 5) {                       // 靠墙天使：手臂贴墙上滑过头回落
             const zDev = Math.abs((wL.z + wR.z) / 2 - shM.z);
             if (zDev > 0.16) {
+                formViolate();
                 showWarn('warnWall', null, now);
                 wasRaised = false;
             } else {
                 const up = wL.y < nose.y && wR.y < nose.y;
+                if (up && !wasRaised) formStart();
                 if (wasRaised && !up && wL.y > ls.y && wR.y > rs.y) award();
                 wasRaised = up;
             }
